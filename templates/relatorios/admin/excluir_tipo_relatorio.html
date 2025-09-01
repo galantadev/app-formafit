@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Excluir Tipo de Relatório</h1>
+        <p class="text-gray-600 mt-2">Confirme a exclusão do tipo de relatório "{{ tipo.nome }}"</p>
+    </div>
+
+    <!-- Breadcrumb -->
+    <nav class="flex mb-6" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+            <li class="inline-flex items-center">
+                <a href="{% url 'accounts:dashboard' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600">
+                    Dashboard
+                </a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    <a href="{% url 'relatorios:admin_tipos_relatorios' %}" class="ml-1 text-sm font-medium text-gray-700 hover:text-blue-600 md:ml-2">Tipos de Relatórios</a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="ml-1 text-sm font-medium text-gray-500 md:ml-2">Excluir</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Cartão de confirmação -->
+    <div class="max-w-2xl mx-auto">
+        <!-- Alerta de perigo -->
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.98-.833-2.75 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Atenção: Esta ação não pode ser desfeita!</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <p>Ao excluir este tipo de relatório, todos os relatórios gerados que utilizaram este tipo também serão afetados. Certifique-se de que realmente deseja prosseguir.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalhes do tipo a ser excluído -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+            <div class="p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Detalhes do Tipo de Relatório</h2>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-gray-600">Nome:</span>
+                        <span class="text-sm text-gray-900">{{ tipo.nome }}</span>
+                    </div>
+                    
+                    {% if tipo.descricao %}
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-gray-600">Descrição:</span>
+                        <span class="text-sm text-gray-900 max-w-md text-right">{{ tipo.descricao|truncatewords:15 }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-gray-600">Status:</span>
+                        {% if tipo.ativo %}
+                            <span class="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">Ativo</span>
+                        {% else %}
+                            <span class="text-sm bg-red-100 text-red-800 px-2 py-1 rounded-full">Inativo</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-gray-600">ID:</span>
+                        <span class="text-sm text-gray-900">{{ tipo.id }}</span>
+                    </div>
+                </div>
+
+                <!-- Configurações -->
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Configurações Atuais:</h3>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="flex items-center">
+                            {% if tipo.incluir_graficos %}
+                                <span class="text-green-600">✓</span>
+                                <span class="ml-2 text-gray-700">Incluir gráficos</span>
+                            {% else %}
+                                <span class="text-gray-400">✗</span>
+                                <span class="ml-2 text-gray-500">Sem gráficos</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center">
+                            {% if tipo.incluir_fotos %}
+                                <span class="text-green-600">✓</span>
+                                <span class="ml-2 text-gray-700">Incluir fotos</span>
+                            {% else %}
+                                <span class="text-gray-400">✗</span>
+                                <span class="ml-2 text-gray-500">Sem fotos</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center">
+                            {% if tipo.incluir_medidas %}
+                                <span class="text-green-600">✓</span>
+                                <span class="ml-2 text-gray-700">Incluir medidas</span>
+                            {% else %}
+                                <span class="text-gray-400">✗</span>
+                                <span class="ml-2 text-gray-500">Sem medidas</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center">
+                            {% if tipo.incluir_frequencia %}
+                                <span class="text-green-600">✓</span>
+                                <span class="ml-2 text-gray-700">Incluir frequência</span>
+                            {% else %}
+                                <span class="text-gray-400">✗</span>
+                                <span class="ml-2 text-gray-500">Sem frequência</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulário de confirmação -->
+        <div class="bg-white rounded-lg shadow-md border border-gray-200">
+            <div class="p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Confirmar Exclusão</h2>
+                <p class="text-sm text-gray-600 mb-6">
+                    Digite "{{ tipo.nome }}" no campo abaixo para confirmar que deseja excluir este tipo de relatório:
+                </p>
+                
+                <form method="post" id="deleteForm" onsubmit="return confirmDelete()">
+                    {% csrf_token %}
+                    
+                    <div class="mb-6">
+                        <label for="confirmacao" class="block text-sm font-medium text-gray-700 mb-2">
+                            Confirmação:
+                        </label>
+                        <input type="text" 
+                               id="confirmacao" 
+                               name="confirmacao"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500"
+                               placeholder="Digite o nome do tipo de relatório">
+                    </div>
+                    
+                    <!-- Botões -->
+                    <div class="flex justify-end space-x-3">
+                        <a href="{% url 'relatorios:admin_tipos_relatorios' %}" 
+                           class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                            Cancelar
+                        </a>
+                        <button type="submit" 
+                                id="deleteButton"
+                                disabled
+                                class="bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                            Excluir Permanentemente
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmInput = document.getElementById('confirmacao');
+    const deleteButton = document.getElementById('deleteButton');
+    const expectedText = "{{ tipo.nome }}";
+    
+    confirmInput.addEventListener('input', function() {
+        if (this.value === expectedText) {
+            deleteButton.disabled = false;
+        } else {
+            deleteButton.disabled = true;
+        }
+    });
+});
+
+function confirmDelete() {
+    const confirmInput = document.getElementById('confirmacao');
+    const expectedText = "{{ tipo.nome }}";
+    
+    if (confirmInput.value !== expectedText) {
+        alert('Por favor, digite exatamente: ' + expectedText);
+        return false;
+    }
+    
+    return confirm('Tem certeza absoluta de que deseja excluir este tipo de relatório? Esta ação não pode ser desfeita.');
+}
+</script>
+{% endblock %}

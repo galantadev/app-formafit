@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load frequencia_filters %}
+
+{% block title %}Calendário de Aulas{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header com navegação -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Calendário de Aulas</h1>
+                <p class="text-gray-600">{{ nome_mes }} {{ ano }}</p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="{% url 'frequencia:dashboard' %}" 
+                   class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M8 15l4-4 4 4"/>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="{% url 'frequencia:agenda_lista' %}" 
+                   class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Lista Agenda
+                </a>
+            </div>
+        </div>
+
+        <!-- Navegação do calendário -->
+        <div class="bg-white shadow rounded-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <a href="?mes={{ mes_anterior }}&ano={{ ano_anterior }}" 
+                       class="flex items-center text-indigo-600 hover:text-indigo-900">
+                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        Anterior
+                    </a>
+                    
+                    <div class="text-center">
+                        <h2 class="text-xl font-semibold text-gray-900">{{ nome_mes }} {{ ano }}</h2>
+                    </div>
+                    
+                    <a href="?mes={{ mes_proximo }}&ano={{ ano_proximo }}" 
+                       class="flex items-center text-indigo-600 hover:text-indigo-900">
+                        Próximo
+                        <svg class="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Calendário -->
+            <div class="p-6">
+                <div class="grid grid-cols-7 gap-1">
+                    <!-- Cabeçalho dos dias da semana -->
+                    {% for dia_semana in dias_semana %}
+                        <div class="bg-gray-100 text-center py-2 text-sm font-medium text-gray-700">
+                            {{ dia_semana }}
+                        </div>
+                    {% endfor %}
+
+                    <!-- Dias do mês -->
+                    {% for semana in dias_mes %}
+                        {% for dia in semana %}
+                            <div class="border border-gray-200 min-h-32 p-1 {% if dia == 0 %}bg-gray-50{% elif dia == hoje.day and mes == hoje.month and ano == hoje.year %}bg-blue-50 border-blue-300{% else %}bg-white{% endif %}">
+                                {% if dia != 0 %}
+                                    <!-- Número do dia -->
+                                    <div class="text-sm font-medium text-gray-900 mb-1">
+                                        {{ dia }}
+                                        {% if dia == hoje.day and mes == hoje.month and ano == hoje.year %}
+                                            <span class="inline-block w-2 h-2 bg-blue-500 rounded-full ml-1"></span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Aulas do dia -->
+                                    {% if dia in aulas_por_dia %}
+                                        <div class="space-y-1">
+                                            {% for aula in aulas_por_dia|get_item:dia %}
+                                                <div class="text-xs p-1 rounded {% if aula.status == 'agendado' %}bg-blue-100 text-blue-800{% elif aula.status == 'confirmado' %}bg-green-100 text-green-800{% elif aula.status == 'realizado' %}bg-gray-100 text-gray-800{% elif aula.status == 'cancelado' %}bg-red-100 text-red-800{% elif aula.status == 'remarcado' %}bg-yellow-100 text-yellow-800{% endif %}" 
+                                                     title="{{ aula.aluno.nome }} - {{ aula.horario_inicio|time:'H:i' }}{% if aula.horario_fim %} às {{ aula.horario_fim|time:'H:i' }}{% endif %}{% if aula.tipo_treino %} - {{ aula.tipo_treino }}{% endif %}">
+                                                    <div class="font-medium truncate">{{ aula.aluno.nome }}</div>
+                                                    <div class="truncate">{{ aula.horario_inicio|time:"H:i" }}</div>
+                                                    {% if aula.tipo_treino %}
+                                                        <div class="truncate">{{ aula.tipo_treino|truncatechars:10 }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <!-- Botão para adicionar aula -->
+                                    <div class="mt-1">
+                                        <a href="{% url 'frequencia:criar_aula' %}?data_aula={{ ano }}-{{ mes|stringformat:'02d' }}-{{ dia|stringformat:'02d' }}" 
+                                           class="block text-center text-xs text-indigo-600 hover:text-indigo-900">
+                                            + Aula
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Legenda -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">Legenda</h3>
+            </div>
+            <div class="px-6 py-4">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-blue-100 border border-blue-300 rounded mr-2"></div>
+                        <span class="text-sm text-gray-700">Agendado</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-green-100 border border-green-300 rounded mr-2"></div>
+                        <span class="text-sm text-gray-700">Confirmado</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-gray-100 border border-gray-300 rounded mr-2"></div>
+                        <span class="text-sm text-gray-700">Realizado</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-red-100 border border-red-300 rounded mr-2"></div>
+                        <span class="text-sm text-gray-700">Cancelado</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded mr-2"></div>
+                        <span class="text-sm text-gray-700">Remarcado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações rápidas -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a href="{% url 'frequencia:criar_aula' %}" 
+               class="flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Agendar Nova Aula
+            </a>
+            
+            <a href="{% url 'frequencia:registrar_presenca' %}" 
+               class="flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Registrar Presença
+            </a>
+            
+            <a href="{% url 'frequencia:lista' %}" 
+               class="flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Ver Registros
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

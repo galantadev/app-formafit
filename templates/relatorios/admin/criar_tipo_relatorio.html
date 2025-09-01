@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Criar Tipo de Relatório</h1>
+        <p class="text-gray-600 mt-2">Configure um novo tipo de relatório para o sistema</p>
+    </div>
+
+    <!-- Breadcrumb -->
+    <nav class="flex mb-6" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+            <li class="inline-flex items-center">
+                <a href="{% url 'accounts:dashboard' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600">
+                    Dashboard
+                </a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    <a href="{% url 'relatorios:admin_tipos_relatorios' %}" class="ml-1 text-sm font-medium text-gray-700 hover:text-blue-600 md:ml-2">Tipos de Relatórios</a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="ml-1 text-sm font-medium text-gray-500 md:ml-2">Criar</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Formulário -->
+    <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md">
+        <form method="post" class="p-6 space-y-6">
+            {% csrf_token %}
+            
+            <!-- Informações Básicas -->
+            <div class="border-b border-gray-200 pb-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="nome" class="block text-sm font-medium text-gray-700 mb-1">
+                            Nome do Tipo de Relatório *
+                        </label>
+                        <input type="text" 
+                               id="nome" 
+                               name="nome" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                               placeholder="Ex: Relatório de Progresso Mensal">
+                    </div>
+                    
+                    <div>
+                        <label for="descricao" class="block text-sm font-medium text-gray-700 mb-1">
+                            Descrição
+                        </label>
+                        <textarea id="descricao" 
+                                  name="descricao" 
+                                  rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="Descrição detalhada do tipo de relatório..."></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="template_filename" class="block text-sm font-medium text-gray-700 mb-1">
+                            Nome do Template
+                        </label>
+                        <input type="text" 
+                               id="template_filename" 
+                               name="template_filename" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                               placeholder="Ex: relatorio_progresso.html">
+                        <p class="text-xs text-gray-500 mt-1">Nome do template HTML que será usado para gerar este tipo de relatório</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configurações do Relatório -->
+            <div class="pb-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Configurações do Relatório</h2>
+                <p class="text-sm text-gray-600 mb-4">Selecione quais informações devem ser incluídas neste tipo de relatório:</p>
+                
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" 
+                               id="incluir_graficos" 
+                               name="incluir_graficos"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="incluir_graficos" class="ml-3 block text-sm font-medium text-gray-700">
+                            Incluir Gráficos
+                            <span class="block text-xs text-gray-500">Gráficos de evolução de peso, medidas, etc.</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" 
+                               id="incluir_fotos" 
+                               name="incluir_fotos"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="incluir_fotos" class="ml-3 block text-sm font-medium text-gray-700">
+                            Incluir Fotos
+                            <span class="block text-xs text-gray-500">Fotos de progresso do aluno</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" 
+                               id="incluir_medidas" 
+                               name="incluir_medidas"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="incluir_medidas" class="ml-3 block text-sm font-medium text-gray-700">
+                            Incluir Medidas Corporais
+                            <span class="block text-xs text-gray-500">Histórico de peso, altura, IMC, etc.</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" 
+                               id="incluir_frequencia" 
+                               name="incluir_frequencia"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="incluir_frequencia" class="ml-3 block text-sm font-medium text-gray-700">
+                            Incluir Dados de Frequência
+                            <span class="block text-xs text-gray-500">Presença nas aulas e treinos</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="border-t border-gray-200 pt-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">Status</h2>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" 
+                           id="ativo" 
+                           name="ativo"
+                           checked
+                           class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="ativo" class="ml-3 block text-sm font-medium text-gray-700">
+                        Tipo de relatório ativo
+                        <span class="block text-xs text-gray-500">Apenas tipos ativos ficam disponíveis para geração de relatórios</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+                <a href="{% url 'relatorios:admin_tipos_relatorios' %}" 
+                   class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    Cancelar
+                </a>
+                <button type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    Criar Tipo de Relatório
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Dica -->
+    <div class="max-w-2xl mx-auto mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.98-.833-2.75 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-yellow-800">Dica</h3>
+                <div class="mt-2 text-sm text-yellow-700">
+                    <p>Escolha um nome descritivo que deixe claro o propósito do relatório. As configurações podem ser alteradas posteriormente através da opção de edição.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
