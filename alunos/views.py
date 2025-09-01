@@ -333,20 +333,27 @@ class AlunoDetailView(LoginRequiredMixin, DetailView):
 
 
 @login_required
-def adicionar_medidas(request, aluno_id):
-    aluno = get_object_or_404(Aluno, pk=aluno_id)
-
+def adicionar_medidas(request, pk):
+    """
+    Adiciona novas medidas corporais para o aluno.
+    """
+    aluno = get_object_or_404(Aluno, pk=pk, personal_trainer=request.user)
+    
     if request.method == 'POST':
-        form = MedidasCorporaisForm(request.POST, aluno=aluno)  # passa o aluno
+        form = MedidasCorporaisForm(request.POST)
         if form.is_valid():
             medida = form.save(commit=False)
             medida.aluno = aluno
             medida.save()
-            return redirect('alunos:detalhes', pk=aluno.pk)
+            messages.success(request, 'Medidas corporais adicionadas com sucesso!')
+            return redirect('alunos:detalhes', pk=pk)
     else:
-        form = MedidasCorporaisForm(aluno=aluno)  # inicial = hoje (editável)
-
-    return render(request, 'alunos/medidas_form.html', {'form': form, 'aluno': aluno})
+        form = MedidasCorporaisForm()
+    
+    return render(request, 'alunos/adicionar_medidas.html', {
+        'form': form,
+        'aluno': aluno
+    })
 
 
 @login_required
