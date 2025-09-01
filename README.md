@@ -101,8 +101,8 @@ python manage.py runserver
 
 ## 👨‍💻 **Desenvolvedor**
 
-**Michael Filho**
-- GitHub: [@](https://github.com/galantadev)
+**Romário Rodrigues**
+- GitHub: [@romariorodrgues](https://github.com/romariorodrgues)
 
 ---
 
