@@ -57,12 +57,15 @@ def dashboard_financeiro(request):
         ativo=True
     ).count()
     
-    # Receita do mês atual (usando FaturaSimples)
+    # Receita do mês atual (baseada na data de pagamento, não de vencimento)
+    data_inicio_mes = hoje.replace(day=1)
+    data_fim_mes = (data_inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    
     receita_mes_atual = FaturaSimples.objects.filter(
         personal_trainer=request.user,
         status='paga',
-        mes_referencia=mes_atual,
-        ano_referencia=ano_atual
+        data_pagamento__gte=data_inicio_mes,
+        data_pagamento__lte=data_fim_mes
     ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     
     # Faturas pendentes
@@ -88,7 +91,7 @@ def dashboard_financeiro(request):
         count=Count('id')
     ).order_by('-total')
     
-    # Receitas dos últimos 6 meses para o gráfico (usando FaturaSimples)
+    # Receitas dos últimos 6 meses para o gráfico (baseadas na data de pagamento)
     receitas_ultimos_meses = []
     nomes_meses = []
     meses_abreviados = {
@@ -105,11 +108,18 @@ def dashboard_financeiro(request):
             mes_calc += 12
             ano_calc -= 1
         
+        # Calcular início e fim do mês
+        data_inicio_mes_calc = hoje.replace(month=mes_calc, year=ano_calc, day=1)
+        if mes_calc == 12:
+            data_fim_mes_calc = hoje.replace(month=1, year=ano_calc+1, day=1) - timedelta(days=1)
+        else:
+            data_fim_mes_calc = hoje.replace(month=mes_calc+1, year=ano_calc, day=1) - timedelta(days=1)
+        
         receita_mes = FaturaSimples.objects.filter(
             personal_trainer=request.user,
             status='paga',
-            mes_referencia=mes_calc,
-            ano_referencia=ano_calc
+            data_pagamento__gte=data_inicio_mes_calc,
+            data_pagamento__lte=data_fim_mes_calc
         ).aggregate(total=Sum('valor'))['total'] or 0
         
         receitas_ultimos_meses.append(float(receita_mes))

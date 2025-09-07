@@ -8,14 +8,14 @@ from django.contrib.auth import login
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView, CreateView, UpdateView
 from django.contrib import messages
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from datetime import timedelta
 
 from .models import User
 from .forms import UserRegistrationForm, UserUpdateForm
 from alunos.models import Aluno
-from financeiro.models import Fatura
+from financeiro.models import Fatura, FaturaSimples
 from frequencia.models import AgendaAula
 # from notificacoes.models import Notificacao  # Notificações desabilitadas
 
@@ -79,18 +79,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             status__in=['agendado', 'confirmado']
         ).order_by('data_aula', 'horario_inicio')[:5]
         
-        # Faturas vencidas
-        context['faturas_vencidas'] = Fatura.objects.filter(
-            contrato__aluno__personal_trainer=user,
-            status__in=['pendente', 'parcial'],
-            data_vencimento__lt=hoje
+        # Faturas vencidas (usando FaturaSimples)
+        context['faturas_vencidas'] = FaturaSimples.objects.filter(
+            personal_trainer=user,
+            status='atrasada'
         ).count()
         
-        # Faturas que vencem hoje
-        context['faturas_vencem_hoje'] = Fatura.objects.filter(
-            contrato__aluno__personal_trainer=user,
-            status__in=['pendente', 'parcial'],
+        # Faturas que vencem hoje (usando FaturaSimples)
+        context['faturas_vencem_hoje'] = FaturaSimples.objects.filter(
+            personal_trainer=user,
+            status='pendente',
             data_vencimento=hoje
+        ).count()
+        
+        # Faturas pendentes (usando FaturaSimples)
+        context['faturas_pendentes'] = FaturaSimples.objects.filter(
+            personal_trainer=user,
+            status='pendente'
         ).count()
         
         # Notificações não lidas (DESABILITADAS)
@@ -106,17 +111,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # ).order_by('-data_criacao')[:5]
         context['ultimas_notificacoes'] = []  # Notificações desabilitadas
         
-        # Receita do mês atual
+        # Receita do mês atual (baseada na data de pagamento)
         mes_atual = hoje.month
         ano_atual = hoje.year
-        faturas_mes = Fatura.objects.filter(
-            contrato__aluno__personal_trainer=user,
-            mes_referencia=mes_atual,
-            ano_referencia=ano_atual
-        )
-        context['receita_prevista_mes'] = sum(f.valor_final for f in faturas_mes)
-        context['receita_recebida_mes'] = sum(f.valor_final for f in faturas_mes if f.status == 'paga')
-        context['receita_mensal'] = context['receita_recebida_mes']  # Alias para o template
+        
+        # Calcular início e fim do mês atual
+        data_inicio_mes = hoje.replace(day=1)
+        data_fim_mes = (data_inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        
+        # Receita recebida no mês (baseada na data de pagamento)
+        receita_mes_atual = FaturaSimples.objects.filter(
+            personal_trainer=user,
+            status='paga',
+            data_pagamento__gte=data_inicio_mes,
+            data_pagamento__lte=data_fim_mes
+        ).aggregate(total=Sum('valor'))['total'] or 0
+        
+        context['receita_mensal'] = receita_mes_atual
         
         # Alunos ativos (count)
         context['alunos_ativos'] = Aluno.objects.filter(
