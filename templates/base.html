@@ -1,3 +1,4 @@
+{% load nav %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -90,35 +91,35 @@
                     <ul class="space-y-2 px-4">
                         <li>
                             <a href="{% url 'accounts:dashboard' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors {% if request.resolver_match.url_name == 'dashboard' %}bg-blue-700{% endif %}">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'accounts:dashboard' %}">
                                 <i class="fas fa-home"></i>
                                 <span>Dashboard</span>
                             </a>
                         </li>
                         <li>
                             <a href="{% url 'alunos:lista' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors {% if 'alunos' in request.resolver_match.url_name %}bg-blue-700{% endif %}">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'alunos:lista' %}">
                                 <i class="fas fa-users"></i>
                                 <span>Alunos</span>
                             </a>
                         </li>
                         <li>
                             <a href="{% url 'frequencia:dashboard' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors {% if 'frequencia' in request.resolver_match.url_name %}bg-blue-700{% endif %}">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'frequencia:dashboard' %}">
                                 <i class="fas fa-calendar"></i>
                                 <span>Frequência</span>
                             </a>
                         </li>
                         <li>
                             <a href="{% url 'financeiro:dashboard' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors {% if 'financeiro' in request.resolver_match.url_name %}bg-blue-700{% endif %}">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'financeiro:dashboard' %}">
                                 <i class="fas fa-dollar-sign"></i>
                                 <span>Financeiro</span>
                             </a>
                         </li>
                         <li>
                             <a href="{% url 'relatorios:lista' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors {% if 'relatorios' in request.resolver_match.url_name %}bg-blue-700{% endif %}">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'relatorios:lista' %}">
                                 <i class="fas fa-chart-line"></i>
                                 <span>Relatórios</span>
                             </a>
@@ -130,14 +131,14 @@
                     <ul class="space-y-2 px-4">
                         <li>
                             <a href="{% url 'accounts:perfil' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'accounts:perfil' %}">
                                 <i class="fas fa-user-cog"></i>
                                 <span>Perfil</span>
                             </a>
                         </li>
                         <li>
                             <a href="{% url 'accounts:configuracoes' %}" 
-                               class="flex items-center space-x-3 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                               class="flex items-center space-x-3 p-3 rounded-lg transition-colors {% nav_active 'accounts:configuracoes' %}">
                                 <i class="fas fa-cog"></i>
                                 <span>Configurações</span>
                             </a>
