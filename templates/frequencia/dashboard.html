@@ -110,10 +110,15 @@
                                 
                                 <!-- Botão de registrar presença -->
                                 {% if aula.status != 'realizado' %}
-                                    <a href="{% url 'frequencia:registrar_presenca' %}?aula_id={{ aula.id }}" 
-                                       class="text-green-600 hover:text-green-900 text-xs font-medium">
-                                        Registrar Presença
-                                    </a>
+                                    <button onclick="registrarPresencaRapido({{ aula.id }})" 
+                                            class="text-green-600 hover:text-green-900 text-xs font-medium bg-green-50 hover:bg-green-100 px-2 py-1 rounded transition-colors"
+                                            id="btn-presenca-{{ aula.id }}">
+                                        ✅ Registrar Presença
+                                    </button>
+                                {% else %}
+                                    <span class="text-green-600 text-xs font-medium">
+                                        ✅ Presença Registrada
+                                    </span>
                                 {% endif %}
                             </div>
                         </div>
@@ -226,9 +231,9 @@
                                          style="width: {{ stat.percentual }}%"></div>
                                 </div>
                                 <span class="text-sm font-medium text-gray-900 w-12 text-right">{{ stat.percentual }}%</span>
-                                <a href="{% url 'frequencia:relatorio_aluno' stat.aluno.id %}" 
+                                <a href="{% url 'frequencia:lista' %}?aluno={{ stat.aluno.id }}" 
                                    class="text-indigo-600 hover:text-indigo-900 text-sm">
-                                    Relatório
+                                    Ver Registros
                                 </a>
                             </div>
                         </div>
@@ -272,4 +277,80 @@
         </a>
     </div>
 </div>
+
+<script>
+function registrarPresencaRapido(aulaId) {
+    const button = document.getElementById(`btn-presenca-${aulaId}`);
+    const originalText = button.innerHTML;
+    
+    // Mostrar loading
+    button.innerHTML = '⏳ Registrando...';
+    button.disabled = true;
+    button.classList.add('opacity-50');
+    
+    // Fazer requisição AJAX
+    fetch(`/frequencia/registrar-presenca-rapido/${aulaId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Sucesso - atualizar interface
+            button.innerHTML = '✅ Presença Registrada';
+            button.classList.remove('bg-green-50', 'hover:bg-green-100', 'text-green-600', 'hover:text-green-900');
+            button.classList.add('text-green-600', 'bg-green-100');
+            
+            // Mostrar mensagem de sucesso
+            showNotification(data.message, 'success');
+            
+            // Atualizar status da aula na interface
+            const statusSpan = button.closest('.flex').querySelector('.inline-flex');
+            if (statusSpan) {
+                statusSpan.innerHTML = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Realizado</span>';
+            }
+            
+        } else {
+            // Erro
+            button.innerHTML = originalText;
+            button.disabled = false;
+            button.classList.remove('opacity-50');
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        // Erro de rede
+        button.innerHTML = originalText;
+        button.disabled = false;
+        button.classList.remove('opacity-50');
+        showNotification('Erro ao registrar presença. Tente novamente.', 'error');
+        console.error('Erro:', error);
+    });
+}
+
+function showNotification(message, type) {
+    // Criar elemento de notificação
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${
+        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <span class="mr-2">${type === 'success' ? '✅' : '❌'}</span>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    // Adicionar ao DOM
+    document.body.appendChild(notification);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+</script>
 {% endblock %}

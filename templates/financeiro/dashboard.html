@@ -22,7 +22,7 @@
                     <div class="ml-5 w-0 flex-1">
                         <dl>
                             <dt class="text-sm font-medium text-gray-500 truncate">Receita do Mês</dt>
-                            <dd class="text-lg font-medium text-gray-900">R$ {{ receita_mes|default:"0,00" }}</dd>
+                            <dd class="text-lg font-medium text-gray-900">R$ {{ receita_mes|floatformat:2|default:"0,00" }}</dd>
                         </dl>
                     </div>
                 </div>
@@ -92,15 +92,6 @@
         <a href="{% url 'financeiro:criar_fatura' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
             <i class="fas fa-plus mr-2"></i>Nova Fatura
         </a>
-        <a href="{% url 'financeiro:criar_contrato' %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-            <i class="fas fa-file-contract mr-2"></i>Novo Contrato
-        </a>
-        <a href="{% url 'financeiro:relatorio_financeiro' %}" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-            <i class="fas fa-chart-bar mr-2"></i>Relatório Financeiro
-        </a>
-        <a href="{% url 'financeiro:lista_planos' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-            <i class="fas fa-tags mr-2"></i>Gerenciar Planos
-        </a>
         <a href="{% url 'financeiro:lista_faturas' %}" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
             <i class="fas fa-list mr-2"></i>Todas as Faturas
         </a>
@@ -133,18 +124,18 @@
                                 </div>
                             </div>
                             <div class="text-right">
-                                <p class="text-sm font-medium text-gray-900">R$ {{ fatura.valor }}</p>
+                                <p class="text-sm font-medium text-gray-900">R$ {{ fatura.valor|floatformat:2 }}</p>
                                 {% if fatura.status == 'pendente' %}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                         Pendente
                                     </span>
-                                {% elif fatura.status == 'pago' %}
+                                {% elif fatura.status == 'paga' %}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        Pago
+                                        Paga
                                     </span>
-                                {% elif fatura.status == 'vencido' %}
+                                {% elif fatura.status == 'atrasada' %}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                        Vencido
+                                        Atrasada
                                     </span>
                                 {% endif %}
                             </div>
@@ -226,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                labels: {{ nomes_meses|safe }},
                 datasets: [{
                     label: 'Receitas (R$)',
                     data: [

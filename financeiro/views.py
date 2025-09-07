@@ -16,7 +16,7 @@ from decimal import Decimal
 import json
 
 from .models import PlanoMensalidade, ContratoAluno, Fatura, Pagamento, FaturaSimples
-from .forms import PlanoMensalidadeForm, ContratoAlunoForm, FaturaForm, PagamentoForm, FiltroFinanceiroForm
+from .forms import PlanoMensalidadeForm, ContratoAlunoForm, FaturaForm, FaturaSimplesForm, PagamentoForm, FiltroFinanceiroForm, GerarFaturasAutomaticasForm
 from .services import FinanceiroService
 from alunos.models import Aluno
 
@@ -34,21 +34,22 @@ def dashboard_financeiro(request):
     stats_gerais = service.calcular_estatisticas_financeiras(request.user)
     stats_mes = service.calcular_estatisticas_financeiras(request.user, mes_atual, ano_atual)
     
-    # Faturas recentes
-    faturas_recentes = Fatura.objects.filter(
-        aluno__personal_trainer=request.user
-    ).select_related('aluno', 'contrato').order_by('-data_criacao')[:10]
+    # Faturas recentes (usando FaturaSimples)
+    faturas_recentes = FaturaSimples.objects.filter(
+        personal_trainer=request.user
+    ).select_related('aluno').order_by('-data_criacao')[:10]
     
-    # Faturas atrasadas
-    faturas_atrasadas = Fatura.objects.filter(
-        aluno__personal_trainer=request.user,
+    # Faturas atrasadas (usando FaturaSimples)
+    faturas_atrasadas = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
         status='atrasada'
     ).select_related('aluno').order_by('data_vencimento')[:5]
     
-    # Pagamentos recentes
-    pagamentos_recentes = Pagamento.objects.filter(
-        fatura__aluno__personal_trainer=request.user
-    ).select_related('fatura', 'fatura__aluno').order_by('-data_pagamento')[:10]
+    # Pagamentos recentes (usando FaturaSimples)
+    pagamentos_recentes = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        status='paga'
+    ).select_related('aluno').order_by('-data_pagamento')[:10]
     
     # Alunos com contratos ativos
     contratos_ativos = ContratoAluno.objects.filter(
@@ -56,18 +57,45 @@ def dashboard_financeiro(request):
         ativo=True
     ).count()
     
-    # Receita por forma de pagamento (últimos 30 dias)
+    # Receita do mês atual (usando FaturaSimples)
+    receita_mes_atual = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        status='paga',
+        mes_referencia=mes_atual,
+        ano_referencia=ano_atual
+    ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+    
+    # Faturas pendentes
+    faturas_pendentes = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        status='pendente'
+    ).count()
+    
+    # Faturas vencidas
+    faturas_vencidas = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        status='atrasada'
+    ).count()
+    
+    # Receita por forma de pagamento (últimos 30 dias) - usando FaturaSimples
     data_limite = hoje - timedelta(days=30)
-    receita_forma_pagamento = Pagamento.objects.filter(
-        fatura__aluno__personal_trainer=request.user,
+    receita_forma_pagamento = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        status='paga',
         data_pagamento__gte=data_limite
-    ).values('forma_pagamento').annotate(
-        total=Sum('valor_pago'),
+    ).values('data_pagamento').annotate(
+        total=Sum('valor'),
         count=Count('id')
     ).order_by('-total')
     
-    # Receitas dos últimos 6 meses para o gráfico
+    # Receitas dos últimos 6 meses para o gráfico (usando FaturaSimples)
     receitas_ultimos_meses = []
+    nomes_meses = []
+    meses_abreviados = {
+        1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
+        7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+    }
+    
     for i in range(5, -1, -1):  # 6 meses atrás até o mês atual
         mes_calc = hoje.month - i
         ano_calc = hoje.year
@@ -77,13 +105,15 @@ def dashboard_financeiro(request):
             mes_calc += 12
             ano_calc -= 1
         
-        receita_mes = Pagamento.objects.filter(
-            fatura__aluno__personal_trainer=request.user,
-            data_pagamento__month=mes_calc,
-            data_pagamento__year=ano_calc
-        ).aggregate(total=Sum('valor_pago'))['total'] or 0
+        receita_mes = FaturaSimples.objects.filter(
+            personal_trainer=request.user,
+            status='paga',
+            mes_referencia=mes_calc,
+            ano_referencia=ano_calc
+        ).aggregate(total=Sum('valor'))['total'] or 0
         
         receitas_ultimos_meses.append(float(receita_mes))
+        nomes_meses.append(meses_abreviados[mes_calc])
     
     context = {
         'stats_gerais': stats_gerais,
@@ -92,8 +122,12 @@ def dashboard_financeiro(request):
         'faturas_atrasadas': faturas_atrasadas,
         'pagamentos_recentes': pagamentos_recentes,
         'contratos_ativos': contratos_ativos,
+        'receita_mes': receita_mes_atual,
+        'faturas_pendentes': faturas_pendentes,
+        'faturas_vencidas': faturas_vencidas,
         'receita_forma_pagamento': receita_forma_pagamento,
         'receitas_ultimos_meses': receitas_ultimos_meses,
+        'nomes_meses': nomes_meses,
         'mes_atual': mes_atual,
         'ano_atual': ano_atual,
     }
@@ -107,9 +141,9 @@ def lista_faturas(request):
     filtro_form = FiltroFinanceiroForm(request.user, request.GET)
     
     # Queryset base
-    faturas = Fatura.objects.filter(
-        aluno__personal_trainer=request.user
-    ).select_related('aluno', 'contrato').order_by('-ano_referencia', '-mes_referencia')
+    faturas = FaturaSimples.objects.filter(
+        personal_trainer=request.user
+    ).select_related('aluno').order_by('-ano_referencia', '-mes_referencia')
     
     # Aplicar filtros
     if filtro_form.is_valid():
@@ -132,13 +166,13 @@ def lista_faturas(request):
         # if filtro_form.cleaned_data.get('data_vencimento_fim'):
         #     faturas = faturas.filter(data_vencimento__lte=filtro_form.cleaned_data['data_vencimento_fim'])
     
-    # Atualizar status das faturas
-    service = FinanceiroService()
-    service.atualizar_status_faturas()
+    # Atualizar status das faturas (FaturaSimples já atualiza automaticamente)
+    # service = FinanceiroService()
+    # service.atualizar_status_faturas()
     
     # Estatísticas da lista filtrada
     total_faturas = faturas.count()
-    valor_total = faturas.aggregate(total=Sum('valor_final'))['total'] or Decimal('0.00')
+    valor_total = faturas.aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     faturas_pagas = faturas.filter(status='paga').count()
     faturas_pendentes = faturas.filter(status__in=['pendente', 'atrasada']).count()
     
@@ -183,7 +217,7 @@ def fatura_detail(request, pk):
 def criar_fatura(request):
     """Criar nova fatura."""
     if request.method == 'POST':
-        form = FaturaForm(request.user, request.POST)
+        form = FaturaSimplesForm(request.user, request.POST)
         if form.is_valid():
             fatura = form.save(commit=False)
             
@@ -194,7 +228,7 @@ def criar_fatura(request):
             messages.success(request, f'Fatura criada com sucesso!')
             return redirect('financeiro:lista_faturas')
     else:
-        form = FaturaForm(user=request.user)
+        form = FaturaSimplesForm(user=request.user)
     
     return render(request, 'financeiro/criar_fatura.html', {'form': form})
 
@@ -203,25 +237,29 @@ def criar_fatura(request):
 def gerar_faturas_automaticas(request):
     """Gerar faturas automáticas para o mês atual."""
     if request.method == 'POST':
-        mes = int(request.POST.get('mes', timezone.now().month))
-        ano = int(request.POST.get('ano', timezone.now().year))
-        
-        service = FinanceiroService()
-        faturas_criadas = service.gerar_faturas_automaticas(mes, ano, request.user)
-        
-        if faturas_criadas:
-            messages.success(
-                request, 
-                f'{len(faturas_criadas)} fatura(s) criada(s) para {mes:02d}/{ano}!'
-            )
-        else:
-            messages.info(request, 'Todas as faturas já foram geradas para este período.')
-        
-        return redirect('financeiro:lista_faturas')
+        form = GerarFaturasAutomaticasForm(request.POST)
+        if form.is_valid():
+            mes = form.cleaned_data['mes_referencia']
+            ano = form.cleaned_data['ano_referencia']
+            valor_fatura = form.cleaned_data['valor_fatura']
+            
+            service = FinanceiroService()
+            faturas_criadas = service.gerar_faturas_automaticas_simples(mes, ano, valor_fatura, request.user)
+            
+            if faturas_criadas:
+                messages.success(
+                    request, 
+                    f'{len(faturas_criadas)} fatura(s) criada(s) para {mes:02d}/{ano} com valor R$ {valor_fatura:.2f}!'
+                )
+            else:
+                messages.info(request, 'Todas as faturas já foram geradas para este período.')
+            
+            return redirect('financeiro:lista_faturas')
+    else:
+        form = GerarFaturasAutomaticasForm()
     
     context = {
-        'mes_atual': timezone.now().month,
-        'ano_atual': timezone.now().year,
+        'form': form,
     }
     
     return render(request, 'financeiro/gerar_faturas.html', context)
@@ -694,7 +732,7 @@ class FinanceiroListView(LoginRequiredMixin, ListView):
 class FaturaCreateView(LoginRequiredMixin, CreateView):
     """Criar nova fatura simples."""
     model = FaturaSimples
-    form_class = FaturaForm
+    form_class = FaturaSimplesForm
     template_name = 'financeiro/fatura_form.html'
     success_url = '/financeiro/faturas/'
     
@@ -712,7 +750,7 @@ class FaturaCreateView(LoginRequiredMixin, CreateView):
 class FaturaUpdateView(LoginRequiredMixin, UpdateView):
     """Editar fatura simples."""
     model = FaturaSimples
-    form_class = FaturaForm
+    form_class = FaturaSimplesForm
     template_name = 'financeiro/fatura_form.html'
     success_url = '/financeiro/faturas/'
     

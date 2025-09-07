@@ -30,6 +30,7 @@
         <div class="bg-white rounded-lg shadow-sm mb-6 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Filtros</h3>
             <form method="get" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {% csrf_token %}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Aluno</label>
                     {{ filtro_form.aluno }}
@@ -163,10 +164,10 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ fatura.mes_referencia|stringformat:"02d" }}/{{ fatura.ano_referencia }}
+                                {{ fatura.mes_nome }}/{{ fatura.ano_referencia }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                R$ {{ fatura.valor_final|floatformat:2 }}
+                                R$ {{ fatura.valor|floatformat:2 }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {{ fatura.data_vencimento|date:"d/m/Y" }}
@@ -188,15 +189,18 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <div class="flex justify-end gap-2">
-                                    <a href="{% url 'financeiro:fatura_detail' fatura.pk %}" 
-                                       class="text-blue-600 hover:text-blue-900" title="Ver detalhes">
+                                    <button onclick="verDetalhes({{ fatura.pk }}, '{{ fatura.aluno.nome }}', '{{ fatura.mes_nome }}/{{ fatura.ano_referencia }}', '{{ fatura.valor }}', '{{ fatura.data_vencimento|date:"d/m/Y" }}', '{{ fatura.status }}', '{{ fatura.data_pagamento|date:"d/m/Y"|default:"-" }}')" 
+                                            class="text-blue-600 hover:text-blue-900" 
+                                            title="Ver detalhes">
                                         <i class="fas fa-eye"></i>
-                                    </a>
+                                    </button>
                                     {% if fatura.status != 'paga' %}
-                                    <a href="{% url 'financeiro:registrar_pagamento' fatura.pk %}" 
-                                       class="text-green-600 hover:text-green-900" title="Registrar pagamento">
+                                    <button onclick="registrarPagamento({{ fatura.pk }})" 
+                                            class="text-green-600 hover:text-green-900" 
+                                            title="Registrar pagamento"
+                                            id="btn-pagar-{{ fatura.pk }}">
                                         <i class="fas fa-money-bill"></i>
-                                    </a>
+                                    </button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -236,4 +240,157 @@
     box-shadow: 0 0 0 1px #3b82f6;
 }
 </style>
+
+<script>
+function registrarPagamento(faturaId) {
+    if (confirm('Tem certeza que deseja marcar esta fatura como paga?')) {
+        const btn = document.getElementById('btn-pagar-' + faturaId);
+        const originalContent = btn.innerHTML;
+        
+        // Mostrar loading
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+        
+        fetch('{% url "financeiro:marcar_como_paga" 0 %}'.replace('0', faturaId), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Atualizar a linha da tabela
+                const row = btn.closest('tr');
+                const statusCell = row.querySelector('td:nth-child(5)');
+                const actionsCell = row.querySelector('td:nth-child(6)');
+                
+                // Atualizar status
+                statusCell.innerHTML = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Paga</span>';
+                
+                // Remover botões de pagamento
+                const pagamentoLinks = actionsCell.querySelectorAll('button[onclick*="registrarPagamento"]');
+                pagamentoLinks.forEach(link => link.remove());
+                
+                // Mostrar mensagem de sucesso
+                showMessage('Fatura marcada como paga!', 'success');
+                
+                // Atualizar estatísticas
+                updateStatistics();
+            } else {
+                showMessage(data.message || 'Erro ao marcar fatura como paga', 'error');
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showMessage('Erro ao marcar fatura como paga', 'error');
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        });
+    }
+}
+
+function verDetalhes(faturaId, alunoNome, periodo, valor, vencimento, status, dataPagamento) {
+    // Criar modal
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">Detalhes da Fatura</h3>
+                    <button onclick="fecharModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="px-6 py-4 space-y-4">
+                <div class="flex justify-between">
+                    <span class="text-sm font-medium text-gray-500">Aluno:</span>
+                    <span class="text-sm text-gray-900">${alunoNome}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm font-medium text-gray-500">Período:</span>
+                    <span class="text-sm text-gray-900">${periodo}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm font-medium text-gray-500">Valor:</span>
+                    <span class="text-sm font-bold text-gray-900">R$ ${valor}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm font-medium text-gray-500">Vencimento:</span>
+                    <span class="text-sm text-gray-900">${vencimento}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm font-medium text-gray-500">Status:</span>
+                    <span class="text-sm ${status === 'paga' ? 'text-green-600 font-semibold' : 'text-yellow-600 font-semibold'}">
+                        ${status === 'paga' ? 'Paga' : 'Pendente'}
+                    </span>
+                </div>
+                ${status === 'paga' ? `
+                <div class="flex justify-between">
+                    <span class="text-sm font-medium text-gray-500">Data do Pagamento:</span>
+                    <span class="text-sm text-gray-900">${dataPagamento}</span>
+                </div>
+                ` : ''}
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-lg">
+                <button onclick="fecharModal()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function fecharModal() {
+    const modal = document.querySelector('.fixed.inset-0');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function showMessage(message, type) {
+    // Criar elemento de mensagem
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    messageDiv.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(messageDiv);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
+
+function updateStatistics() {
+    // Recarregar a página para atualizar as estatísticas
+    // Em uma implementação mais avançada, você poderia fazer uma chamada AJAX
+    // para atualizar apenas as estatísticas sem recarregar a página
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
+
+// Fechar modal ao clicar fora dele
+document.addEventListener('click', function(event) {
+    const modal = document.querySelector('.fixed.inset-0');
+    if (modal && event.target === modal) {
+        fecharModal();
+    }
+});
+</script>
 {% endblock %}

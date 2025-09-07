@@ -22,5 +22,6 @@ urlpatterns = [
     path('aula/<int:pk>/status/', views.alterar_status_rapido, name='alterar_status_rapido'),
     path('registros/', views.RegistroPresencaListView.as_view(), name='lista'),
     path('registrar-presenca/', views.RegistroPresencaCreateView.as_view(), name='registrar_presenca'),
+    path('registrar-presenca-rapido/<int:aula_id>/', views.registrar_presenca_rapido, name='registrar_presenca_rapido'),
     path('calendario/', views.calendario_view, name='calendario'),
 ]

@@ -428,3 +428,56 @@ def calendario_view(request):
     }
     
     return render(request, 'frequencia/calendario.html', context)
+
+
+@login_required
+def registrar_presenca_rapido(request, aula_id):
+    """
+    Registra presença rapidamente com um clique.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Método não permitido'})
+    
+    try:
+        # Buscar a aula
+        aula = get_object_or_404(AgendaAula, pk=aula_id, aluno__personal_trainer=request.user)
+        
+        # Verificar se já existe registro de presença
+        registro_existente = RegistroPresenca.objects.filter(
+            aluno=aula.aluno,
+            data_aula=aula.data_aula,
+            horario_inicio=aula.horario_inicio
+        ).first()
+        
+        if registro_existente:
+            return JsonResponse({
+                'success': False, 
+                'message': f'Presença já registrada para {aula.aluno.nome} em {aula.data_aula.strftime("%d/%m/%Y")}'
+            })
+        
+        # Criar registro de presença
+        registro = RegistroPresenca.objects.create(
+            aluno=aula.aluno,
+            data_aula=aula.data_aula,
+            horario_inicio=aula.horario_inicio,
+            horario_fim=aula.horario_fim,
+            status='presente',
+            observacoes=f'Aula realizada - {aula.tipo_treino}'
+        )
+        
+        # Atualizar status da aula para 'realizado'
+        aula.status = 'realizado'
+        aula.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Presença registrada com sucesso para {aula.aluno.nome}!',
+            'registro_id': registro.id,
+            'status': 'presente'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Erro ao registrar presença: {str(e)}'
+        })

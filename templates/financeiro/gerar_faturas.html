@@ -36,50 +36,78 @@
 
         <!-- Formulário -->
         <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <form method="post" class="space-y-6">
+            <form method="post" class="space-y-6" novalidate>
                 {% csrf_token %}
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="mes" class="block text-sm font-medium text-gray-700 mb-2">
-                            Mês de Referência *
+                <!-- Campos de mês e ano -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label for="{{ form.mes_referencia.id_for_label }}" class="form-label">
+                            <i class="fas fa-calendar mr-2 text-blue-600" aria-hidden="true"></i>{{ form.mes_referencia.label }} *
                         </label>
-                        <select name="mes" id="mes" class="form-control" required>
-                            <option value="1" {% if mes_atual == 1 %}selected{% endif %}>Janeiro</option>
-                            <option value="2" {% if mes_atual == 2 %}selected{% endif %}>Fevereiro</option>
-                            <option value="3" {% if mes_atual == 3 %}selected{% endif %}>Março</option>
-                            <option value="4" {% if mes_atual == 4 %}selected{% endif %}>Abril</option>
-                            <option value="5" {% if mes_atual == 5 %}selected{% endif %}>Maio</option>
-                            <option value="6" {% if mes_atual == 6 %}selected{% endif %}>Junho</option>
-                            <option value="7" {% if mes_atual == 7 %}selected{% endif %}>Julho</option>
-                            <option value="8" {% if mes_atual == 8 %}selected{% endif %}>Agosto</option>
-                            <option value="9" {% if mes_atual == 9 %}selected{% endif %}>Setembro</option>
-                            <option value="10" {% if mes_atual == 10 %}selected{% endif %}>Outubro</option>
-                            <option value="11" {% if mes_atual == 11 %}selected{% endif %}>Novembro</option>
-                            <option value="12" {% if mes_atual == 12 %}selected{% endif %}>Dezembro</option>
-                        </select>
+                        <div class="form-input-wrapper">
+                            {{ form.mes_referencia }}
+                            <div class="form-icon-right" aria-hidden="true">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
+                        {% if form.mes_referencia.errors %}
+                            <div class="form-error" role="alert">
+                                <i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>
+                                <span>{{ form.mes_referencia.errors.0 }}</span>
+                            </div>
+                        {% endif %}
                     </div>
                     
-                    <div>
-                        <label for="ano" class="block text-sm font-medium text-gray-700 mb-2">
-                            Ano de Referência *
+                    <div class="form-group">
+                        <label for="{{ form.ano_referencia.id_for_label }}" class="form-label">
+                            <i class="fas fa-calendar mr-2 text-blue-600" aria-hidden="true"></i>{{ form.ano_referencia.label }} *
                         </label>
-                        <select name="ano" id="ano" class="form-control" required>
-                            {% for ano in "2024 2025 2026"|make_list %}
-                                <option value="{{ ano }}" {% if ano_atual|stringformat:"s" == ano %}selected{% endif %}>{{ ano }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="form-input-wrapper">
+                            {{ form.ano_referencia }}
+                            <div class="form-icon-right" aria-hidden="true">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
+                        {% if form.ano_referencia.errors %}
+                            <div class="form-error" role="alert">
+                                <i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>
+                                <span>{{ form.ano_referencia.errors.0 }}</span>
+                            </div>
+                        {% endif %}
                     </div>
+                </div>
+
+                <!-- Campo de valor -->
+                <div class="form-group">
+                    <label for="{{ form.valor_fatura.id_for_label }}" class="form-label">
+                        <i class="fas fa-dollar-sign mr-2 text-green-600" aria-hidden="true"></i>{{ form.valor_fatura.label }} *
+                    </label>
+                    <div class="form-input-wrapper">
+                        <div class="form-prefix" aria-hidden="true">R$</div>
+                        {{ form.valor_fatura }}
+                    </div>
+                    {% if form.valor_fatura.help_text %}
+                        <div class="text-sm text-gray-500 mt-1" role="note">
+                            {{ form.valor_fatura.help_text }}
+                        </div>
+                    {% endif %}
+                    {% if form.valor_fatura.errors %}
+                        <div class="form-error" role="alert">
+                            <i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>
+                            <span>{{ form.valor_fatura.errors.0 }}</span>
+                        </div>
+                    {% endif %}
                 </div>
 
                 <!-- Resumo -->
                 <div class="bg-gray-50 rounded-lg p-4">
                     <h4 class="text-sm font-medium text-gray-900 mb-2">O que será feito:</h4>
                     <ul class="text-sm text-gray-700 space-y-1">
-                        <li><i class="fas fa-check text-green-600 mr-2"></i>Buscar todos os alunos com contratos ativos</li>
+                        <li><i class="fas fa-check text-green-600 mr-2"></i>Buscar todos os alunos ativos do personal trainer</li>
                         <li><i class="fas fa-check text-green-600 mr-2"></i>Verificar se já existe fatura para o período</li>
-                        <li><i class="fas fa-check text-green-600 mr-2"></i>Criar fatura com valor do plano do contrato</li>
-                        <li><i class="fas fa-check text-green-600 mr-2"></i>Definir data de vencimento baseada no dia do plano</li>
+                        <li><i class="fas fa-check text-green-600 mr-2"></i>Criar fatura com o valor especificado para cada aluno</li>
+                        <li><i class="fas fa-check text-green-600 mr-2"></i>Definir data de vencimento para o último dia do mês</li>
                     </ul>
                 </div>
 
@@ -106,9 +134,9 @@
                     <h4 class="text-sm font-medium text-blue-900">Informações Adicionais:</h4>
                     <ul class="text-sm text-blue-700 mt-1 space-y-1">
                         <li>• As faturas serão criadas com status "pendente"</li>
-                        <li>• O valor será baseado no plano de mensalidade do contrato do aluno</li>
-                        <li>• A data de vencimento será definida conforme configuração do plano</li>
-                        <li>• Alunos sem contrato ativo serão ignorados</li>
+                        <li>• O valor será o mesmo para todos os alunos (valor especificado)</li>
+                        <li>• A data de vencimento será o último dia do mês selecionado</li>
+                        <li>• Apenas alunos ativos do personal trainer serão incluídos</li>
                         <li>• Não serão criadas faturas duplicadas para o mesmo período</li>
                     </ul>
                 </div>
@@ -118,15 +146,35 @@
 </div>
 
 <style>
+/* Sistema de formulário consistente */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.form-input-wrapper {
+    position: relative;
+    display: block;
+}
+
 .form-control {
     display: block;
     width: 100%;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+    background-color: #f9fafb;
     border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border-radius: 0.5rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
+    color: #374151;
+    transition: all 0.2s ease-in-out;
 }
 
 .form-control:focus {
@@ -134,6 +182,120 @@
     outline-offset: 2px;
     border-color: #3b82f6;
     box-shadow: 0 0 0 1px #3b82f6;
+    background-color: #ffffff;
+}
+
+.form-control:hover {
+    border-color: #9ca3af;
+}
+
+/* Selects */
+select.form-control {
+    background-image: none;
+    padding-right: 2.5rem;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Inputs de número */
+input[type="number"].form-control::-webkit-outer-spin-button,
+input[type="number"].form-control::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Ícones posicionados */
+.form-icon-right {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Campos com prefixo (R$) */
+.form-control[data-prefix] {
+    padding-left: 2.5rem;
+}
+
+.form-prefix {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #6b7280;
+    font-weight: 500;
+    z-index: 1;
+}
+
+/* Ajustar padding do campo valor quando tem prefixo */
+.form-input-wrapper:has(.form-prefix) .form-control {
+    padding-left: 2.5rem;
+}
+
+/* Mensagens de erro */
+.form-error {
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Grid responsivo */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+@media (min-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Espaçamento */
+.form-spacing {
+    margin-bottom: 1.5rem;
+}
+
+/* Botões */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-primary {
+    background-color: #10b981;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #059669;
+}
+
+.btn-secondary {
+    background-color: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #4b5563;
 }
 </style>
 {% endblock %}

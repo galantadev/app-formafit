@@ -435,12 +435,14 @@ def acompanhamento_mensal(request, pk, ano, mes):
     aluno = get_object_or_404(Aluno, pk=pk, personal_trainer=request.user)
     
     # Verificar se já existe acompanhamento para este mês/ano
-    acompanhamento, created = AcompanhamentoMensal.objects.get_or_create(
-        aluno=aluno,
-        ano=ano,
-        mes=mes,
-        defaults={}
-    )
+    try:
+        acompanhamento = AcompanhamentoMensal.objects.get(
+            aluno=aluno,
+            ano=ano,
+            mes=mes
+        )
+    except AcompanhamentoMensal.DoesNotExist:
+        acompanhamento = None
     
     if request.method == 'POST':
         form = AcompanhamentoMensalForm(request.POST, instance=acompanhamento)

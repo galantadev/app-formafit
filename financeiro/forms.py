@@ -183,6 +183,13 @@ class FaturaForm(forms.ModelForm):
             else:
                 self.fields['aluno'].choices = [('', 'Nenhum aluno com contrato ativo encontrado')]
         
+        # Configurar opções de mês com nomes
+        self.fields['mes_referencia'].choices = [
+            (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+            (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+            (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro')
+        ]
+        
         # Configurar valores padrão
         if not self.instance.pk:  # Apenas para novos registros
             from django.utils import timezone
@@ -307,9 +314,13 @@ class FiltroFinanceiroForm(forms.Form):
     """
     Formulário para filtrar dados financeiros.
     """
-    MESES_CHOICES = [('', 'Todos os meses')] + [(i, f"{i:02d}") for i in range(1, 13)]
+    MESES_CHOICES = [('', 'Todos os meses')] + [
+        (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+        (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+        (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro')
+    ]
     ANOS_CHOICES = [('', 'Todos os anos')] + [(i, str(i)) for i in range(2020, 2030)]
-    STATUS_CHOICES = [('', 'Todos os status')] + Fatura.STATUS_CHOICES
+    STATUS_CHOICES = [('', 'Todos os status')] + FaturaSimples.STATUS_CHOICES
     
     aluno = forms.ModelChoiceField(
         queryset=Aluno.objects.all(),
@@ -358,7 +369,11 @@ class GerarFaturaForm(forms.Form):
     Formulário para gerar faturas em lote.
     """
     mes_referencia = forms.ChoiceField(
-        choices=[(i, f"{i:02d}") for i in range(1, 13)],
+        choices=[
+            (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+            (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+            (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro')
+        ],
         widget=forms.Select(attrs={
             'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm'
         })
@@ -390,7 +405,7 @@ class GerarFaturaForm(forms.Form):
         )
 
 
-class FaturaForm(forms.ModelForm):
+class FaturaSimplesForm(forms.ModelForm):
     """
     Formulário simplificado para criação de faturas.
     """
@@ -407,28 +422,26 @@ class FaturaForm(forms.ModelForm):
         }
         widgets = {
             'aluno': forms.Select(attrs={
-                'class': 'form-control w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                'class': 'form-control'
             }),
             'mes_referencia': forms.Select(attrs={
-                'class': 'form-control w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                'class': 'form-control'
             }),
-            'ano_referencia': forms.NumberInput(attrs={
-                'class': 'form-control w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-                'min': '2020',
-                'max': '2030'
+            'ano_referencia': forms.Select(attrs={
+                'class': 'form-control'
             }),
             'valor': forms.NumberInput(attrs={
-                'class': 'form-control w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                'class': 'form-control',
                 'step': '0.01',
                 'min': '0',
                 'placeholder': '0.00'
             }),
             'data_vencimento': forms.DateInput(attrs={
-                'class': 'form-control w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                'class': 'form-control',
                 'type': 'date'
             }),
             'observacoes': forms.Textarea(attrs={
-                'class': 'form-control w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                'class': 'form-control',
                 'rows': 3,
                 'placeholder': 'Observações sobre a fatura (opcional)'
             })
@@ -441,6 +454,20 @@ class FaturaForm(forms.ModelForm):
             personal_trainer=user,
             ativo=True
         )
+        
+        # Adicionar opção vazia para o campo aluno
+        self.fields['aluno'].empty_label = "Selecione um aluno..."
+        
+        # Configurar opções de mês com nomes
+        self.fields['mes_referencia'].choices = [
+            ('', 'Selecione o mês...'),
+            (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+            (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+            (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro')
+        ]
+        
+        # Adicionar opção vazia para o campo ano
+        self.fields['ano_referencia'].empty_label = "Selecione o ano"
         
         # Se estamos editando, desabilitar campos que não devem ser alterados
         if self.instance.pk:
@@ -472,3 +499,49 @@ class FaturaForm(forms.ModelForm):
                 )
         
         return cleaned_data
+
+
+class GerarFaturasAutomaticasForm(forms.Form):
+    """Formulário para geração automática de faturas."""
+    
+    mes_referencia = forms.ChoiceField(
+        choices=[
+            (1, 'Janeiro'), (2, 'Fevereiro'), (3, 'Março'), (4, 'Abril'),
+            (5, 'Maio'), (6, 'Junho'), (7, 'Julho'), (8, 'Agosto'),
+            (9, 'Setembro'), (10, 'Outubro'), (11, 'Novembro'), (12, 'Dezembro')
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-control'
+        }),
+        label='Mês de Referência'
+    )
+    
+    ano_referencia = forms.ChoiceField(
+        choices=[(i, str(i)) for i in range(2024, 2035)],
+        widget=forms.Select(attrs={
+            'class': 'form-control'
+        }),
+        label='Ano de Referência'
+    )
+    
+    valor_fatura = forms.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        min_value=0.01,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0.01',
+            'placeholder': '0.00'
+        }),
+        label='Valor da Fatura (R$)',
+        help_text='Valor que será aplicado a todas as faturas geradas'
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Definir valores padrão
+        from django.utils import timezone
+        now = timezone.now()
+        self.fields['mes_referencia'].initial = now.month
+        self.fields['ano_referencia'].initial = now.year

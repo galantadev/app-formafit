@@ -90,11 +90,15 @@ class MedidasCorporaisForm(forms.ModelForm):
     class Meta:
         model = MedidasCorporais
         fields = [
-            'peso', 'percentual_gordura', 'pescoco', 'torax', 
+            'data_medicao', 'peso', 'percentual_gordura', 'pescoco', 'torax', 
             'cintura', 'quadril', 'braco_direito', 'braco_esquerdo',
             'coxa_direita', 'coxa_esquerda', 'observacoes'
         ]
         widgets = {
+            'data_medicao': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm'
+            }),
             'peso': forms.NumberInput(attrs={
                 'step': '0.1',
                 'min': '20',

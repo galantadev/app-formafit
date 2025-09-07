@@ -262,6 +262,7 @@ class FaturaSimples(models.Model):
         help_text="Mês de referência da fatura"
     )
     ano_referencia = models.IntegerField(
+        choices=[(i, str(i)) for i in range(2024, 2035)],
         help_text="Ano de referência da fatura"
     )
     valor = models.DecimalField(

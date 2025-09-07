@@ -26,7 +26,7 @@ import pandas as pd
 from io import BytesIO
 import base64
 
-from .models import PlanoMensalidade, ContratoAluno, Fatura, Pagamento
+from .models import PlanoMensalidade, ContratoAluno, Fatura, Pagamento, FaturaSimples
 from alunos.models import Aluno
 
 
@@ -103,6 +103,50 @@ class FinanceiroService:
                     mes_referencia=mes,
                     ano_referencia=ano,
                     valor_original=contrato.valor_mensalidade,
+                    data_vencimento=data_vencimento,
+                    status='pendente'
+                )
+                
+                faturas_criadas.append(fatura)
+        
+        return faturas_criadas
+    
+    def gerar_faturas_automaticas_simples(self, mes, ano, valor_fatura, personal_trainer):
+        """Gera faturas automáticas simples para todos os alunos ativos."""
+        faturas_criadas = []
+        
+        # Buscar todos os alunos ativos do personal trainer
+        alunos = Aluno.objects.filter(
+            personal_trainer=personal_trainer,
+            ativo=True
+        )
+        
+        for aluno in alunos:
+            # Verificar se já existe fatura para o período
+            fatura_existente = FaturaSimples.objects.filter(
+                aluno=aluno,
+                mes_referencia=mes,
+                ano_referencia=ano
+            ).exists()
+            
+            if not fatura_existente:
+                # Calcular data de vencimento (último dia do mês)
+                try:
+                    if mes == 12:
+                        data_vencimento = datetime(ano + 1, 1, 1) - timedelta(days=1)
+                    else:
+                        data_vencimento = datetime(ano, mes + 1, 1) - timedelta(days=1)
+                except ValueError:
+                    # Caso o dia não exista no mês
+                    data_vencimento = datetime(ano, mes, 28).date()
+                
+                # Criar fatura simples
+                fatura = FaturaSimples.objects.create(
+                    aluno=aluno,
+                    personal_trainer=personal_trainer,
+                    mes_referencia=mes,
+                    ano_referencia=ano,
+                    valor=valor_fatura,
                     data_vencimento=data_vencimento,
                     status='pendente'
                 )
