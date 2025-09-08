@@ -34,28 +34,31 @@ def dashboard_financeiro(request):
     stats_gerais = service.calcular_estatisticas_financeiras(request.user)
     stats_mes = service.calcular_estatisticas_financeiras(request.user, mes_atual, ano_atual)
     
-    # Faturas recentes (usando FaturaSimples)
+    # Faturas recentes (usando FaturaSimples - apenas alunos ativos)
     faturas_recentes = FaturaSimples.objects.filter(
-        personal_trainer=request.user
+        personal_trainer=request.user,
+        aluno__ativo=True
     ).select_related('aluno').order_by('-data_criacao')[:10]
     
-    # Faturas atrasadas (usando FaturaSimples)
+    # Faturas atrasadas (usando FaturaSimples - apenas alunos ativos)
     faturas_atrasadas = FaturaSimples.objects.filter(
         personal_trainer=request.user,
+        aluno__ativo=True,
         status='atrasada'
     ).select_related('aluno').order_by('data_vencimento')[:5]
     
-    # Pagamentos recentes (usando FaturaSimples)
+    # Pagamentos recentes (usando FaturaSimples - apenas alunos ativos)
     pagamentos_recentes = FaturaSimples.objects.filter(
         personal_trainer=request.user,
+        aluno__ativo=True,
         status='paga'
     ).select_related('aluno').order_by('-data_pagamento')[:10]
     
-    # Alunos com contratos ativos
-    contratos_ativos = ContratoAluno.objects.filter(
-        aluno__personal_trainer=request.user,
-        ativo=True
-    ).count()
+    # Alunos ativos (usando FaturaSimples para contar alunos únicos)
+    contratos_ativos = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        aluno__ativo=True
+    ).values('aluno').distinct().count()
     
     # Receita do mês atual (baseada na data de pagamento, não de vencimento)
     data_inicio_mes = hoje.replace(day=1)
@@ -63,27 +66,31 @@ def dashboard_financeiro(request):
     
     receita_mes_atual = FaturaSimples.objects.filter(
         personal_trainer=request.user,
+        aluno__ativo=True,
         status='paga',
         data_pagamento__gte=data_inicio_mes,
         data_pagamento__lte=data_fim_mes
     ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     
-    # Faturas pendentes
+    # Faturas pendentes (apenas alunos ativos)
     faturas_pendentes = FaturaSimples.objects.filter(
         personal_trainer=request.user,
+        aluno__ativo=True,
         status='pendente'
     ).count()
     
-    # Faturas vencidas
+    # Faturas vencidas (apenas alunos ativos)
     faturas_vencidas = FaturaSimples.objects.filter(
         personal_trainer=request.user,
+        aluno__ativo=True,
         status='atrasada'
     ).count()
     
-    # Receita por forma de pagamento (últimos 30 dias) - usando FaturaSimples
+    # Receita por forma de pagamento (últimos 30 dias) - usando FaturaSimples (apenas alunos ativos)
     data_limite = hoje - timedelta(days=30)
     receita_forma_pagamento = FaturaSimples.objects.filter(
         personal_trainer=request.user,
+        aluno__ativo=True,
         status='paga',
         data_pagamento__gte=data_limite
     ).values('data_pagamento').annotate(
@@ -117,6 +124,7 @@ def dashboard_financeiro(request):
         
         receita_mes = FaturaSimples.objects.filter(
             personal_trainer=request.user,
+            aluno__ativo=True,
             status='paga',
             data_pagamento__gte=data_inicio_mes_calc,
             data_pagamento__lte=data_fim_mes_calc
@@ -150,9 +158,10 @@ def lista_faturas(request):
     """Lista de faturas com filtros."""
     filtro_form = FiltroFinanceiroForm(request.user, request.GET)
     
-    # Queryset base
+    # Queryset base (apenas alunos ativos)
     faturas = FaturaSimples.objects.filter(
-        personal_trainer=request.user
+        personal_trainer=request.user,
+        aluno__ativo=True  # Apenas alunos ativos
     ).select_related('aluno').order_by('-ano_referencia', '-mes_referencia')
     
     # Aplicar filtros
@@ -316,7 +325,8 @@ def registrar_pagamento(request, fatura_id):
 def lista_contratos(request):
     """Lista de contratos."""
     contratos = ContratoAluno.objects.filter(
-        aluno__personal_trainer=request.user
+        aluno__personal_trainer=request.user,
+        aluno__ativo=True  # Apenas alunos ativos
     ).select_related('aluno', 'plano_mensalidade').order_by('-data_inicio')
     
     context = {
@@ -393,8 +403,11 @@ def deletar_plano(request, pk):
     """Deletar plano de mensalidade."""
     plano = get_object_or_404(PlanoMensalidade, pk=pk)
     
-    # Verificar se há contratos vinculados
-    contratos_vinculados = ContratoAluno.objects.filter(plano_mensalidade=plano).count()
+    # Verificar se há contratos vinculados (apenas alunos ativos)
+    contratos_vinculados = ContratoAluno.objects.filter(
+        plano_mensalidade=plano,
+        aluno__ativo=True
+    ).count()
     
     if contratos_vinculados > 0:
         messages.error(
@@ -455,13 +468,12 @@ def inadimplencia_view(request):
     valor_minimo = request.GET.get('valor_minimo')
     ordenar = request.GET.get('ordenar', 'dias_atraso')
     
-    # Query base - faturas vencidas
+    # Query base - faturas atrasadas (usando FaturaSimples)
     hoje = timezone.now().date()
-    faturas_vencidas = Fatura.objects.filter(
-        contrato__aluno__personal_trainer=request.user,
-        status='pendente',
-        data_vencimento__lt=hoje
-    ).select_related('contrato__aluno', 'contrato__plano_mensalidade')
+    faturas_vencidas = FaturaSimples.objects.filter(
+        personal_trainer=request.user,
+        status='atrasada'
+    ).select_related('aluno')
     
     # Aplicar filtros
     if dias_atraso:
@@ -469,57 +481,43 @@ def inadimplencia_view(request):
         faturas_vencidas = faturas_vencidas.filter(data_vencimento__lte=data_limite)
     
     if valor_minimo:
-        faturas_vencidas = faturas_vencidas.filter(valor_final__gte=valor_minimo)
+        faturas_vencidas = faturas_vencidas.filter(valor__gte=valor_minimo)
     
-    # Adicionar campo calculado de dias de atraso
-    for fatura in faturas_vencidas:
-        fatura.dias_atraso = (hoje - fatura.data_vencimento).days
+    # O campo dias_atraso já é calculado automaticamente pela propriedade do modelo
     
     # Ordenação
     if ordenar == 'dias_atraso':
         faturas_vencidas = sorted(faturas_vencidas, key=lambda f: f.dias_atraso, reverse=True)
     elif ordenar == 'valor':
-        faturas_vencidas = faturas_vencidas.order_by('-valor_final')
+        faturas_vencidas = faturas_vencidas.order_by('-valor')
     elif ordenar == 'vencimento':
         faturas_vencidas = faturas_vencidas.order_by('data_vencimento')
     elif ordenar == 'aluno':
-        faturas_vencidas = faturas_vencidas.order_by('contrato__aluno__nome')
+        faturas_vencidas = faturas_vencidas.order_by('aluno__nome')
     
     # Paginação
     paginator = Paginator(faturas_vencidas, 20)
     page_number = request.GET.get('page')
     faturas_vencidas = paginator.get_page(page_number)
     
-    # Estatísticas resumo
-    todas_faturas = Fatura.objects.filter(contrato__aluno__personal_trainer=request.user)
+    # Estatísticas resumo (usando FaturaSimples)
+    todas_faturas = FaturaSimples.objects.filter(personal_trainer=request.user)
     total_faturas = todas_faturas.count()
-    total_vencidas = todas_faturas.filter(
-        status='pendente',
-        data_vencimento__lt=hoje
-    ).count()
+    total_vencidas = todas_faturas.filter(status='atrasada').count()
     
-    total_em_atraso = todas_faturas.filter(
-        status='pendente',
-        data_vencimento__lt=hoje
-    ).aggregate(total=Sum('valor_final'))['total'] or Decimal('0.00')
+    total_em_atraso = todas_faturas.filter(status='atrasada').aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
     
-    clientes_inadimplentes = todas_faturas.filter(
-        status='pendente',
-        data_vencimento__lt=hoje
-    ).values('contrato__aluno').distinct().count()
+    clientes_inadimplentes = todas_faturas.filter(status='atrasada').values('aluno').distinct().count()
     
-    total_clientes = ContratoAluno.objects.filter(
-        aluno__personal_trainer=request.user,
+    total_clientes = Aluno.objects.filter(
+        personal_trainer=request.user,
         ativo=True
     ).count()
     
     taxa_inadimplencia = (total_vencidas / max(total_faturas, 1)) * 100
     
     # Calcular média de dias em atraso
-    faturas_com_atraso = todas_faturas.filter(
-        status='pendente',
-        data_vencimento__lt=hoje
-    )
+    faturas_com_atraso = todas_faturas.filter(status='atrasada')
     
     total_dias_atraso = sum((hoje - f.data_vencimento).days for f in faturas_com_atraso)
     media_dias_atraso = total_dias_atraso // max(faturas_com_atraso.count(), 1)
@@ -616,8 +614,12 @@ def ajax_delete_plano(request, pk):
     try:
         plano = get_object_or_404(PlanoMensalidade, pk=pk)
         
-        # Verificar se há contratos usando este plano
-        contratos_ativos = ContratoAluno.objects.filter(plano_mensalidade=plano, ativo=True)
+        # Verificar se há contratos usando este plano (apenas alunos ativos)
+        contratos_ativos = ContratoAluno.objects.filter(
+            plano_mensalidade=plano, 
+            ativo=True,
+            aluno__ativo=True
+        )
         if contratos_ativos.exists():
             return JsonResponse({
                 'error': 'Não é possível excluir este plano pois há contratos ativos vinculados.'

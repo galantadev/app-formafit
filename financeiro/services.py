@@ -71,10 +71,11 @@ class FinanceiroService:
         """Gera faturas automáticas para um mês específico."""
         faturas_criadas = []
         
-        # Buscar contratos ativos
+        # Buscar contratos ativos (aluno e contrato devem estar ativos)
         contratos = ContratoAluno.objects.filter(
             aluno__personal_trainer=personal_trainer,
-            ativo=True,
+            aluno__ativo=True,  # Aluno deve estar ativo
+            ativo=True,  # Contrato deve estar ativo
             data_inicio__lte=timezone.now().date()
         ).filter(
             Q(data_fim__isnull=True) | Q(data_fim__gte=timezone.now().date())
@@ -439,79 +440,37 @@ class FinanceiroService:
         return pagamento
     
     def gerar_relatorio_periodo(self, personal_trainer, data_inicio, data_fim):
-        """Gera relatório financeiro para um período específico."""
-        # Filtros base
-        faturas_qs = Fatura.objects.filter(
-            contrato__aluno__personal_trainer=personal_trainer,
+        """Gera relatório financeiro para um período específico usando FaturaSimples."""
+        # Filtros base usando FaturaSimples - todas as faturas do período
+        faturas_qs = FaturaSimples.objects.filter(
+            personal_trainer=personal_trainer,
             data_vencimento__gte=data_inicio,
             data_vencimento__lte=data_fim
-        ).select_related('contrato__aluno', 'contrato__plano_mensalidade')
+        ).select_related('aluno')
         
-        pagamentos_qs = Pagamento.objects.filter(
-            fatura__contrato__aluno__personal_trainer=personal_trainer,
-            data_pagamento__gte=data_inicio,
-            data_pagamento__lte=data_fim
-        )
+        # Todas as faturas do período (para exibição completa)
+        todas_faturas = faturas_qs.order_by('-data_vencimento')
         
         # Calcular estatísticas
-        receita_total = pagamentos_qs.aggregate(
-            total=Sum('valor_pago')
-        )['total'] or Decimal('0.00')
+        receita_total = faturas_qs.filter(
+            status='paga',
+            data_pagamento__gte=data_inicio,
+            data_pagamento__lte=data_fim
+        ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
         
         faturas_pagas = faturas_qs.filter(status='paga').count()
         faturas_pendentes = faturas_qs.filter(status='pendente').count()
-        faturas_vencidas = faturas_qs.filter(
-            status='pendente',
-            data_vencimento__lt=timezone.now().date()
-        ).count()
+        faturas_vencidas = faturas_qs.filter(status='atrasada').count()
         
         receita_pendente = faturas_qs.filter(
-            status='pendente'
-        ).aggregate(total=Sum('valor_final'))['total'] or Decimal('0.00')
+            status__in=['pendente', 'atrasada']
+        ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
         
         total_faturas = faturas_qs.count()
         taxa_inadimplencia = (faturas_vencidas / max(total_faturas, 1)) * 100
         
-        # Receita por plano
-        receita_por_plano = []
-        planos = PlanoMensalidade.objects.filter(
-            contratoaluno__aluno__personal_trainer=personal_trainer
-        ).distinct()
-        
-        for plano in planos:
-            contratos_ativos = ContratoAluno.objects.filter(
-                aluno__personal_trainer=personal_trainer,
-                plano_mensalidade=plano,
-                ativo=True
-            ).count()
-            
-            receita_plano = pagamentos_qs.filter(
-                fatura__contrato__plano_mensalidade=plano
-            ).aggregate(total=Sum('valor_pago'))['total'] or Decimal('0.00')
-            
-            pendente_plano = faturas_qs.filter(
-                contrato__plano_mensalidade=plano,
-                status='pendente'
-            ).aggregate(total=Sum('valor_final'))['total'] or Decimal('0.00')
-            
-            total_plano = receita_plano + pendente_plano
-            taxa_pagamento = (receita_plano / max(total_plano, 1)) * 100
-            
-            receita_por_plano.append({
-                'nome': plano.nome,
-                'contratos_ativos': contratos_ativos,
-                'receita_total': receita_plano,
-                'receita_pendente': pendente_plano,
-                'taxa_pagamento': round(taxa_pagamento, 1)
-            })
-        
-        # Últimas faturas
-        ultimas_faturas = faturas_qs.order_by('-data_vencimento')[:10]
-        
-        # Dados para gráfico (últimos 6 meses)
-        labels_meses = []
-        dados_receita = []
-        
+        # Receita por mês (últimos 6 meses)
+        receita_por_mes = []
         mes_atual = data_fim.month
         ano_atual = data_fim.year
         
@@ -523,13 +482,47 @@ class FinanceiroService:
                 mes_calc += 12
                 ano_calc -= 1
             
-            receita_mes = pagamentos_qs.filter(
-                data_pagamento__month=mes_calc,
-                data_pagamento__year=ano_calc
-            ).aggregate(total=Sum('valor_pago'))['total'] or Decimal('0.00')
+            receita_mes = faturas_qs.filter(
+                status='paga',
+                mes_referencia=mes_calc,
+                ano_referencia=ano_calc
+            ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
             
-            labels_meses.append(f"{mes_calc:02d}/{ano_calc}")
-            dados_receita.append(float(receita_mes))
+            receita_por_mes.append({
+                'mes': f"{mes_calc:02d}/{ano_calc}",
+                'receita': float(receita_mes)
+            })
+        
+        # Receita por aluno
+        receita_por_aluno = []
+        alunos = Aluno.objects.filter(
+            personal_trainer=personal_trainer,
+            ativo=True
+        )
+        
+        for aluno in alunos:
+            faturas_aluno = faturas_qs.filter(aluno=aluno)
+            receita_aluno = faturas_aluno.filter(status='paga').aggregate(
+                total=Sum('valor')
+            )['total'] or Decimal('0.00')
+            
+            pendente_aluno = faturas_aluno.filter(
+                status__in=['pendente', 'atrasada']
+            ).aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+            
+            total_aluno = receita_aluno + pendente_aluno
+            taxa_pagamento = (receita_aluno / max(total_aluno, 1)) * 100
+            
+            receita_por_aluno.append({
+                'nome': aluno.nome,
+                'receita_total': receita_aluno,
+                'receita_pendente': pendente_aluno,
+                'taxa_pagamento': round(taxa_pagamento, 1)
+            })
+        
+        # Dados para gráfico
+        labels_meses = [item['mes'] for item in receita_por_mes]
+        dados_receita = [item['receita'] for item in receita_por_mes]
         
         return {
             'receita_total': receita_total,
@@ -538,8 +531,8 @@ class FinanceiroService:
             'faturas_pendentes': faturas_pendentes,
             'faturas_vencidas': faturas_vencidas,
             'taxa_inadimplencia': round(taxa_inadimplencia, 2),
-            'receita_por_plano': receita_por_plano,
-            'ultimas_faturas': ultimas_faturas,
+            'receita_por_aluno': receita_por_aluno,
+            'todas_faturas': todas_faturas,
             'labels_meses': labels_meses,
             'dados_receita': dados_receita,
         }
