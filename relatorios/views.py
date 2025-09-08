@@ -130,19 +130,59 @@ def download_relatorio_view(request, pk):
         personal_trainer=request.user
     )
     
-    if not relatorio.arquivo_pdf or relatorio.status != 'concluido':
+    if relatorio.status != 'concluido':
         messages.error(request, 'Relatório não está disponível para download.')
         return redirect('relatorios:detalhe', pk=pk)
     
-    try:
-        return FileResponse(
-            open(relatorio.arquivo_pdf.path, 'rb'),
-            as_attachment=True,
-            filename=f"relatorio_{relatorio.aluno.nome}_{relatorio.data_inicio}.pdf"
-        )
-    except FileNotFoundError:
-        messages.error(request, 'Arquivo do relatório não encontrado.')
-        return redirect('relatorios:detalhe', pk=pk)
+    # Para demonstração, vamos criar um arquivo de texto simples
+    from django.http import HttpResponse
+    from django.utils import timezone
+    
+    response = HttpResponse(content_type='text/plain')
+    response['Content-Disposition'] = f'attachment; filename="{relatorio.titulo}.txt"'
+    
+    conteudo = f"""
+RELATÓRIO DE PROGRESSO
+======================
+
+Título: {relatorio.titulo}
+Aluno: {relatorio.aluno.nome}
+Período: {relatorio.get_periodo_display()}
+Data Início: {relatorio.data_inicio.strftime('%d/%m/%Y')}
+Data Fim: {relatorio.data_fim.strftime('%d/%m/%Y')}
+Gerado em: {relatorio.data_geracao.strftime('%d/%m/%Y %H:%M')}
+
+PROGRESSO FÍSICO
+================
+"""
+    
+    if relatorio.peso_inicial:
+        conteudo += f"Peso Inicial: {relatorio.peso_inicial}kg\n"
+    if relatorio.peso_final:
+        conteudo += f"Peso Final: {relatorio.peso_final}kg\n"
+    if relatorio.diferenca_peso:
+        conteudo += f"Variação: {relatorio.diferenca_peso}kg\n"
+    if relatorio.imc_inicial:
+        conteudo += f"IMC Inicial: {relatorio.imc_inicial}\n"
+    if relatorio.imc_final:
+        conteudo += f"IMC Final: {relatorio.imc_final}\n"
+    
+    conteudo += f"""
+FREQUÊNCIA
+==========
+Total de Treinos: {relatorio.total_treinos}
+Percentual de Frequência: {relatorio.percentual_frequencia:.1f}%
+
+OBSERVAÇÕES
+===========
+{relatorio.observacoes or 'Nenhuma observação registrada.'}
+
+---
+Relatório gerado automaticamente pelo sistema FormaFit
+"""
+    
+    response.write(conteudo)
+    return response
 
 
 @login_required

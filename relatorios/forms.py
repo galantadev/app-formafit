@@ -11,8 +11,18 @@ from alunos.models import Aluno
 class GerarRelatorioForm(forms.ModelForm):
     """Formulário para gerar relatório de progresso."""
     
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        if user:
+            self.fields['aluno'].queryset = Aluno.objects.filter(
+                personal_trainer=user,
+                ativo=True
+            )
+    
     aluno = forms.ModelChoiceField(
-        queryset=Aluno.objects.all(),
+        queryset=Aluno.objects.none(),
         widget=forms.Select(attrs={
             'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
         }),
