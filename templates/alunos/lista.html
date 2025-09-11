@@ -185,7 +185,6 @@
                                         <div class="py-1">
                                             <a href="{% url 'alunos:detalhes' aluno.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Ver Detalhes</a>
                                             <a href="{% url 'alunos:editar' aluno.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Editar</a>
-                                            <a href="{% url 'alunos:adicionar_medidas' aluno.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Adicionar Medidas</a>
                                             <a href="{% url 'alunos:estatisticas' aluno.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Estatísticas</a>
                                             <button onclick="toggleStatus({{ aluno.pk }})"
                                                     class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">

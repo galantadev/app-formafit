@@ -26,8 +26,7 @@ class AlunoForm(forms.ModelForm):
         model = Aluno
         fields = [
             'nome', 'email', 'telefone', 'data_nascimento',
-            'sexo', 'altura', 'peso_inicial', 'objetivo',
-            'observacoes', 'endereco', 'ativo'
+            'sexo', 'altura', 'peso_inicial', 'observacoes', 'endereco', 'ativo'
         ]
         widgets = {
             'nome': forms.TextInput(attrs={
@@ -59,23 +58,18 @@ class AlunoForm(forms.ModelForm):
                 'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
                 'placeholder': 'Ex: 70.5'
             }),
-            'objetivo': forms.Textarea(attrs={
-                'rows': 3,
-                'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
-                'placeholder': 'Descreva os objetivos do aluno...'
-            }),
             'nivel_atividade': forms.Select(attrs={
                 'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm'
+            }),
+            'observacoes': forms.Textarea(attrs={
+                'rows': 3,
+                'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
+                'placeholder': 'Objetivos do aluno, histórico médico, restrições, observações gerais...'
             }),
             'endereco': forms.Textarea(attrs={
                 'rows': 2,
                 'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
                 'placeholder': 'Endereço completo...'
-            }),
-            'observacoes': forms.Textarea(attrs={
-                'rows': 3,
-                'class': 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
-                'placeholder': 'Observações gerais, histórico médico, restrições...'
             }),
             'ativo': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded'

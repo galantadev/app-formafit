@@ -537,11 +537,15 @@ def estatisticas_aluno(request, pk):
     
     # Frequência mensal
     from frequencia.models import RegistroPresenca
+    from django.db.models import Count
+    from django.db import connection
+    
+    # Usar SQLite strftime para agrupar por mês/ano
     frequencia_mensal = RegistroPresenca.objects.filter(
         aluno=aluno,
-        presente=True
+        status='presente'
     ).extra(
-        select={'mes': "DATE_FORMAT(data_presenca, '%%Y-%%m')"}
+        select={'mes': "strftime('%%Y-%%m', data_aula)"}
     ).values('mes').annotate(total=Count('id')).order_by('mes')
     
     context = {
