@@ -15,7 +15,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib.colors import HexColor
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib import colors
@@ -30,6 +30,7 @@ from io import BytesIO
 from .models import RelatorioProgresso, TipoRelatorio
 from alunos.models import Aluno, MedidasCorporais
 from frequencia.models import RegistroPresenca
+from financeiro.models import Fatura
 
 
 class RelatorioService:
@@ -98,7 +99,14 @@ class RelatorioService:
             # Calcular estatísticas básicas
             self._calcular_estatisticas(relatorio, dados)
             
-            # Para demonstração, vamos marcar como concluído sem gerar PDF
+            # Gerar gráficos para o relatório
+            graficos = self._gerar_graficos(relatorio, dados)
+            
+            # Criar o PDF
+            arquivo_pdf = self._criar_pdf(relatorio, dados, graficos)
+            
+            # Atualizar o relatório com o caminho do arquivo
+            relatorio.arquivo_pdf = arquivo_pdf
             relatorio.status = 'concluido'
             relatorio.save()
             
@@ -121,7 +129,8 @@ class RelatorioService:
             'periodo': f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}",
             'medidas': [],
             'presencas': [],
-            'estatisticas': {}
+            'estatisticas': {},
+            'faturas': []
         }
         
         # Medidas corporais no período
@@ -137,20 +146,30 @@ class RelatorioService:
         presencas = RegistroPresenca.objects.filter(
             aluno=aluno,
             data_aula__gte=data_inicio,
-            data_aula__lte=data_fim,
-            status='presente'
+            data_aula__lte=data_fim
         ).order_by('data_aula')
         
         dados['presencas'] = list(presencas)
         
+        # Faturas do aluno
+        faturas = Fatura.objects.filter(
+            aluno=aluno
+        ).order_by('-ano_referencia', '-mes_referencia')[:12]  # Últimas 12 faturas
+        
+        dados['faturas'] = list(faturas)
+        
         # Estatísticas básicas
         total_dias = (data_fim - data_inicio).days + 1
-        total_presencas = len(dados['presencas'])
+        total_presencas = len([p for p in dados['presencas'] if p.status == 'presente'])
+        total_faltas = len([p for p in dados['presencas'] if p.status == 'falta'])
+        total_faltas_justificadas = len([p for p in dados['presencas'] if p.status == 'falta_justificada'])
         
         dados['estatisticas'] = {
             'total_dias': total_dias,
             'total_presencas': total_presencas,
-            'percentual_frequencia': (total_presencas / max(total_dias, 1)) * 100,
+            'total_faltas': total_faltas,
+            'total_faltas_justificadas': total_faltas_justificadas,
+            'percentual_frequencia': (total_presencas / max(len(dados['presencas']), 1)) * 100,
             'media_treinos_semana': (total_presencas / max(total_dias / 7, 1)),
         }
         
@@ -166,6 +185,15 @@ class RelatorioService:
             altura = aluno.altura or Decimal('1.70')  # Altura padrão se não informada
             dados['estatisticas']['imc_inicial'] = peso_inicial / (altura ** 2)
             dados['estatisticas']['imc_final'] = peso_final / (altura ** 2)
+        
+        # Estatísticas de faturas
+        faturas_pagas = [f for f in dados['faturas'] if f.status == 'paga']
+        faturas_pendentes = [f for f in dados['faturas'] if f.status == 'pendente']
+        faturas_atrasadas = [f for f in dados['faturas'] if f.status == 'atrasada']
+        
+        dados['estatisticas']['faturas_pagas'] = len(faturas_pagas)
+        dados['estatisticas']['faturas_pendentes'] = len(faturas_pendentes)
+        dados['estatisticas']['faturas_atrasadas'] = len(faturas_atrasadas)
         
         return dados
     
@@ -328,8 +356,44 @@ class RelatorioService:
         
         return grafico_base64
     
+    def _gerar_graficos(self, relatorio, dados):
+        """Gera os gráficos para o relatório."""
+        graficos = {}
+        
+        # Verificar se temos dados suficientes para gerar gráficos
+        if 'medidas' in dados and len(dados['medidas']) > 1:
+            try:
+                import matplotlib.pyplot as plt
+                import io
+                from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+                
+                # Gráfico de evolução de peso
+                if 'peso' in dados['medidas'][0]:
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    datas = [m['data'] for m in dados['medidas']]
+                    pesos = [m['peso'] for m in dados['medidas']]
+                    
+                    ax.plot(datas, pesos, 'o-', color='#3b82f6')
+                    ax.set_title('Evolução do Peso')
+                    ax.set_ylabel('Peso (kg)')
+                    ax.grid(True, linestyle='--', alpha=0.7)
+                    
+                    # Salvar em buffer
+                    buf = io.BytesIO()
+                    canvas = FigureCanvas(fig)
+                    canvas.print_figure(buf, format='png')
+                    buf.seek(0)
+                    
+                    graficos['peso'] = buf
+                    plt.close(fig)
+            except Exception as e:
+                # Logar erro mas continuar sem gráficos
+                print(f"Erro ao gerar gráficos: {str(e)}")
+        
+        return graficos
+        
     def _criar_pdf(self, relatorio, dados, graficos):
-        """Cria o arquivo PDF do relatório."""
+        """Cria o arquivo PDF do relatório com informações detalhadas do aluno."""
         # Definir caminho do arquivo
         filename = f"relatorio_{relatorio.aluno.id}_{relatorio.data_inicio}_{relatorio.data_fim}.pdf"
         filepath = os.path.join(settings.MEDIA_ROOT, 'relatorios', filename)
@@ -348,57 +412,239 @@ class RelatorioService:
         story.append(Paragraph(f"Data de geração: {timezone.now().strftime('%d/%m/%Y às %H:%M')}", self.texto_style))
         story.append(Spacer(1, 20))
         
+        # SEÇÃO 1: INFORMAÇÕES DO ALUNO
+        aluno = dados['aluno']
+        story.append(Paragraph("Informações do Aluno", self.subtitulo_style))
+        
+        # Tabela com dados do aluno
+        dados_aluno = [
+            [Paragraph("Nome Completo:", self.texto_style), Paragraph(aluno.nome, self.texto_style)],
+            [Paragraph("Data de Nascimento:", self.texto_style), Paragraph(aluno.data_nascimento.strftime('%d/%m/%Y') if hasattr(aluno, 'data_nascimento') and aluno.data_nascimento else "Não informado", self.texto_style)],
+            [Paragraph("Telefone:", self.texto_style), Paragraph(aluno.telefone if hasattr(aluno, 'telefone') else "Não informado", self.texto_style)],
+            [Paragraph("E-mail:", self.texto_style), Paragraph(aluno.email if hasattr(aluno, 'email') else "Não informado", self.texto_style)],
+            [Paragraph("Altura:", self.texto_style), Paragraph(f"{aluno.altura:.2f} m" if hasattr(aluno, 'altura') and aluno.altura else "Não informado", self.texto_style)],
+            [Paragraph("Objetivo:", self.texto_style), Paragraph(aluno.objetivo if hasattr(aluno, 'objetivo') else "Não informado", self.texto_style)],
+        ]
+        
+        tabela_aluno = Table(dados_aluno, colWidths=[120, 300])
+        tabela_aluno.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(tabela_aluno)
+        story.append(Spacer(1, 20))
+        
         # Resumo executivo
         story.append(Paragraph("Resumo Executivo", self.subtitulo_style))
         
+        # Tabela com estatísticas
+        dados_estatisticas = []
+        
+        # Cabeçalho da tabela
+        dados_estatisticas.append([Paragraph("Métrica", self.texto_style), Paragraph("Valor", self.texto_style)])
+        
+        # Informações de peso
         if 'peso_inicial' in dados['estatisticas']:
             peso_inicial = dados['estatisticas']['peso_inicial']
             peso_final = dados['estatisticas']['peso_final']
             diferenca = dados['estatisticas']['diferenca_peso']
             
-            story.append(Paragraph(f"• Peso inicial: {peso_inicial:.1f} kg", self.texto_style))
-            story.append(Paragraph(f"• Peso final: {peso_final:.1f} kg", self.texto_style))
+            dados_estatisticas.append([Paragraph("Peso Inicial", self.texto_style), Paragraph(f"{peso_inicial:.1f} kg", self.texto_style)])
+            dados_estatisticas.append([Paragraph("Peso Final", self.texto_style), Paragraph(f"{peso_final:.1f} kg", self.texto_style)])
             
             if diferenca > 0:
-                story.append(Paragraph(f"• Ganho de peso: +{diferenca:.1f} kg", self.destaque_style))
+                dados_estatisticas.append([Paragraph("Ganho de Peso", self.texto_style), Paragraph(f"+{diferenca:.1f} kg", self.destaque_style)])
             elif diferenca < 0:
-                story.append(Paragraph(f"• Perda de peso: {diferenca:.1f} kg", self.destaque_style))
+                dados_estatisticas.append([Paragraph("Perda de Peso", self.texto_style), Paragraph(f"{diferenca:.1f} kg", self.destaque_style)])
             else:
-                story.append(Paragraph("• Peso mantido", self.destaque_style))
+                dados_estatisticas.append([Paragraph("Variação de Peso", self.texto_style), Paragraph("Peso mantido", self.destaque_style)])
+            
+            dados_estatisticas.append([Paragraph("IMC Inicial", self.texto_style), Paragraph(f"{dados['estatisticas']['imc_inicial']:.2f}", self.texto_style)])
+            dados_estatisticas.append([Paragraph("IMC Final", self.texto_style), Paragraph(f"{dados['estatisticas']['imc_final']:.2f}", self.texto_style)])
         
-        story.append(Paragraph(f"• Total de treinos: {dados['estatisticas']['total_presencas']}", self.texto_style))
-        story.append(Paragraph(f"• Frequência: {dados['estatisticas']['percentual_frequencia']:.1f}%", self.texto_style))
-        story.append(Paragraph(f"• Média de treinos por semana: {dados['estatisticas']['media_treinos_semana']:.1f}", self.texto_style))
+        # Informações de frequência
+        dados_estatisticas.append([Paragraph("Total de Treinos", self.texto_style), Paragraph(f"{dados['estatisticas']['total_presencas']}", self.texto_style)])
+        dados_estatisticas.append([Paragraph("Total de Faltas", self.texto_style), Paragraph(f"{dados['estatisticas']['total_faltas']}", self.texto_style)])
+        dados_estatisticas.append([Paragraph("Frequência", self.texto_style), Paragraph(f"{dados['estatisticas']['percentual_frequencia']:.1f}%", self.texto_style)])
+        dados_estatisticas.append([Paragraph("Média de Treinos por Semana", self.texto_style), Paragraph(f"{dados['estatisticas']['media_treinos_semana']:.1f}", self.texto_style)])
         
+        tabela_estatisticas = Table(dados_estatisticas, colWidths=[200, 220])
+        tabela_estatisticas.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(tabela_estatisticas)
         story.append(Spacer(1, 20))
         
-        # Gráficos
+        # Adicionar gráficos se disponíveis
         if graficos:
             story.append(Paragraph("Gráficos de Evolução", self.subtitulo_style))
             
-            for nome_grafico, grafico_base64 in graficos.items():
-                # Decodificar imagem
-                grafico_data = base64.b64decode(grafico_base64)
-                grafico_buffer = BytesIO(grafico_data)
-                
-                # Adicionar imagem ao PDF
-                img = Image(grafico_buffer, width=15*cm, height=9*cm)
+            if 'peso' in graficos:
+                story.append(Spacer(1, 10))
+                story.append(Paragraph("Evolução do Peso", self.texto_style))
+                img = Image(graficos['peso'], width=450, height=250)
                 story.append(img)
-                story.append(Spacer(1, 15))
+            
+            if 'frequencia' in graficos:
+                story.append(Spacer(1, 10))
+                story.append(Paragraph("Frequência de Treinos", self.texto_style))
+                img = Image(graficos['frequencia'], width=450, height=250)
+                story.append(img)
+            
+            if 'medidas' in graficos:
+                story.append(Spacer(1, 10))
+                story.append(Paragraph("Evolução de Medidas Corporais", self.texto_style))
+                img = Image(graficos['medidas'], width=450, height=250)
+                story.append(img)
         
-        # Observações
-        if relatorio.observacoes:
-            story.append(Paragraph("Observações", self.subtitulo_style))
-            story.append(Paragraph(relatorio.observacoes, self.texto_style))
+        # Medidas corporais detalhadas
+        if dados['medidas']:
+            story.append(Spacer(1, 20))
+            story.append(Paragraph("Medidas Corporais Detalhadas", self.subtitulo_style))
+            
+            # Cabeçalho da tabela de medidas
+            cabecalho_medidas = ["Data", "Peso (kg)", "Tórax (cm)", "Cintura (cm)", "Braço D (cm)", "Coxa D (cm)"]
+            
+            dados_medidas = [cabecalho_medidas]
+            
+            for medida in dados['medidas']:
+                linha = [
+                    medida.data_medicao.strftime('%d/%m/%Y'),
+                    f"{medida.peso:.1f}" if medida.peso else "-",
+                    f"{medida.torax:.1f}" if medida.torax else "-",
+                    f"{medida.cintura:.1f}" if medida.cintura else "-",
+                    f"{medida.braco_direito:.1f}" if medida.braco_direito else "-",
+                    f"{medida.coxa_direita:.1f}" if medida.coxa_direita else "-",
+                ]
+                dados_medidas.append(linha)
+            
+            # Criar tabela de medidas
+            tabela_medidas = Table(dados_medidas, repeatRows=1)
+            tabela_medidas.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 4),
+                ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ]))
+            story.append(tabela_medidas)
         
-        # Rodapé
-        story.append(Spacer(1, 30))
-        story.append(Paragraph("FormaFit - Sistema de Gestão para Personal Trainers", self.styles['Normal']))
+        # Registro de presenças
+        if dados['presencas']:
+            story.append(PageBreak())
+            story.append(Paragraph("Registro de Presenças", self.subtitulo_style))
+            story.append(Spacer(1, 12))
+            
+            # Cabeçalho da tabela de presenças
+            cabecalho_presencas = ["Data", "Horário", "Status", "Observações"]
+            
+            dados_presencas = [cabecalho_presencas]
+            
+            for presenca in dados['presencas']:
+                horario = f"{presenca.horario_inicio.strftime('%H:%M')}"
+                if presenca.horario_fim:
+                    horario += f" - {presenca.horario_fim.strftime('%H:%M')}"
+                
+                linha = [
+                    presenca.data_aula.strftime('%d/%m/%Y'),
+                    horario,
+                    presenca.get_status_display(),
+                    presenca.observacoes[:50] + '...' if presenca.observacoes and len(presenca.observacoes) > 50 else (presenca.observacoes or "")
+                ]
+                dados_presencas.append(linha)
+            
+            # Criar tabela de presenças
+            tabela_presencas = Table(dados_presencas, colWidths=[80, 80, 100, 200], repeatRows=1)
+            tabela_presencas.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+                ('ALIGN', (0, 0), (2, -1), 'CENTER'),
+            ]))
+            story.append(tabela_presencas)
         
-        # Construir PDF
+        # Situação financeira
+        if dados['faturas']:
+            story.append(PageBreak())
+            story.append(Paragraph("Situação Financeira", self.subtitulo_style))
+            story.append(Spacer(1, 12))
+            
+            # Resumo financeiro
+            dados_resumo_financeiro = [
+                [Paragraph("Métrica", self.texto_style), Paragraph("Valor", self.texto_style)],
+                [Paragraph("Faturas Pagas", self.texto_style), Paragraph(f"{dados['estatisticas']['faturas_pagas']}", self.texto_style)],
+                [Paragraph("Faturas Pendentes", self.texto_style), Paragraph(f"{dados['estatisticas']['faturas_pendentes']}", self.texto_style)],
+                [Paragraph("Faturas Atrasadas", self.texto_style), Paragraph(f"{dados['estatisticas']['faturas_atrasadas']}", self.texto_style)],
+            ]
+            
+            tabela_resumo_financeiro = Table(dados_resumo_financeiro, colWidths=[200, 220])
+            tabela_resumo_financeiro.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            story.append(tabela_resumo_financeiro)
+            story.append(Spacer(1, 20))
+            
+            # Detalhes das faturas
+            story.append(Paragraph("Detalhes das Faturas", self.texto_style))
+            story.append(Spacer(1, 12))
+            
+            # Cabeçalho da tabela de faturas
+            cabecalho_faturas = ["Referência", "Vencimento", "Valor", "Status"]
+            
+            dados_faturas = [cabecalho_faturas]
+            
+            for fatura in dados['faturas']:
+                referencia = f"{fatura.mes_referencia}/{fatura.ano_referencia}"
+                linha = [
+                    referencia,
+                    fatura.data_vencimento.strftime('%d/%m/%Y') if hasattr(fatura, 'data_vencimento') and fatura.data_vencimento else "-",
+                    f"R$ {fatura.valor_final:.2f}".replace('.', ',') if hasattr(fatura, 'valor_final') else "-",
+                    fatura.get_status_display() if hasattr(fatura, 'get_status_display') else fatura.status.capitalize()
+                ]
+                dados_faturas.append(linha)
+            
+            # Criar tabela de faturas
+            tabela_faturas = Table(dados_faturas, colWidths=[100, 100, 100, 100], repeatRows=1)
+            
+            # Estilo base da tabela
+            estilo_tabela = [
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ]
+            
+            # Adicionar cores de fundo para cada linha baseada no status
+            for i, fatura in enumerate(dados['faturas'], 1):
+                cor_status = colors.white
+                if hasattr(fatura, 'status'):
+                    if fatura.status == 'paga':
+                        cor_status = colors.lightgreen
+                    elif fatura.status == 'atrasada':
+                        cor_status = colors.lightcoral
+                    elif fatura.status == 'pendente':
+                        cor_status = colors.lightyellow
+                
+                estilo_tabela.append(('BACKGROUND', (0, i), (-1, i), cor_status))
+            
+            tabela_faturas.setStyle(TableStyle(estilo_tabela))
+            story.append(tabela_faturas)
+        
+        # Construir o PDF
         doc.build(story)
         
-        return f"relatorios/{filename}"
+        # Retornar o caminho relativo para salvar no modelo
+        return os.path.join('relatorios', filename)
     
     def _calcular_estatisticas(self, relatorio, dados):
         """Atualiza as estatísticas do relatório."""

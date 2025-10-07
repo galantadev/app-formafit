@@ -98,7 +98,7 @@ def dashboard_financeiro(request):
         count=Count('id')
     ).order_by('-total')
     
-    # Receitas dos últimos 6 meses para o gráfico (baseadas na data de pagamento)
+    # Receitas dos últimos 6 meses para o gráfico (baseadas no mês de referência e status paga)
     receitas_ultimos_meses = []
     nomes_meses = []
     meses_abreviados = {
@@ -108,26 +108,21 @@ def dashboard_financeiro(request):
     
     for i in range(5, -1, -1):  # 6 meses atrás até o mês atual
         mes_calc = hoje.month - i
-        ano_calc = hoje.year
+        ano_calc = 2025  # Usando o ano fixo 2025 onde existem as faturas
         
         # Ajustar ano se o mês for menor que 1
         if mes_calc <= 0:
             mes_calc += 12
             ano_calc -= 1
         
-        # Calcular início e fim do mês
-        data_inicio_mes_calc = hoje.replace(month=mes_calc, year=ano_calc, day=1)
-        if mes_calc == 12:
-            data_fim_mes_calc = hoje.replace(month=1, year=ano_calc+1, day=1) - timedelta(days=1)
-        else:
-            data_fim_mes_calc = hoje.replace(month=mes_calc+1, year=ano_calc, day=1) - timedelta(days=1)
-        
+        # Calcular receita baseada no mês de referência (não na data de pagamento)
+        # Isso garante que todas as faturas pagas sejam contabilizadas no mês correto
         receita_mes = FaturaSimples.objects.filter(
             personal_trainer=request.user,
             aluno__ativo=True,
             status='paga',
-            data_pagamento__gte=data_inicio_mes_calc,
-            data_pagamento__lte=data_fim_mes_calc
+            mes_referencia=mes_calc,
+            ano_referencia=ano_calc
         ).aggregate(total=Sum('valor'))['total'] or 0
         
         receitas_ultimos_meses.append(float(receita_mes))
